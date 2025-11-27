@@ -3,7 +3,12 @@ import { GoogleGenAI } from "@google/genai";
 import { ArtStyle, AspectRatio, GenerationConfig, GenerationResult } from "../types";
 
 // Initialize the client
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Initialize the client lazily or with a placeholder to prevent crash on load
+const getAiClient = () => {
+  const apiKey = process.env.API_KEY || "PLACEHOLDER_KEY_FOR_UI_RENDERING";
+  return new GoogleGenAI({ apiKey });
+};
+// const ai = new GoogleGenAI({ apiKey: process.env.API_KEY }); // OLD CRASHING CODE
 
 const MODEL_NAME = "gemini-2.5-flash-image";
 const TEXT_MODEL_NAME = "gemini-2.5-flash";
@@ -55,10 +60,10 @@ export const generateContent = async (config: GenerationConfig): Promise<Generat
         mimeType: mimeType,
       },
     });
-    
+
     // Logic branching based on Task Type
     if (taskType === 'editing') {
-       promptPrefix += "Perform the following EDIT on the provided image. Maintain the original structure, lighting, and background unless told otherwise. Instruction: ";
+      promptPrefix += "Perform the following EDIT on the provided image. Maintain the original structure, lighting, and background unless told otherwise. Instruction: ";
     } else {
       // Standard Generation with Reference
       if (characterReferenceImage) {
@@ -71,7 +76,7 @@ export const generateContent = async (config: GenerationConfig): Promise<Generat
 
   // 3. Construct Final Text Prompt
   let finalPrompt = promptPrefix + prompt;
-  
+
   if (style !== ArtStyle.NO_STYLE) {
     finalPrompt = `${finalPrompt} style: ${style}.`;
   }
@@ -89,7 +94,7 @@ export const generateContent = async (config: GenerationConfig): Promise<Generat
   try {
     const apiAspectRatio = mapAspectRatio(aspectRatio);
 
-    const response = await ai.models.generateContent({
+    const response = await getAiClient().models.generateContent({
       model: MODEL_NAME,
       contents: {
         parts: parts,
@@ -125,20 +130,20 @@ export const generateContent = async (config: GenerationConfig): Promise<Generat
 
 export const describeImage = async (base64Image: string, mimeType: string): Promise<string> => {
   const cleanBase64 = base64Image.replace(/^data:(.*,)?/, '');
-  
+
   try {
-    const response = await ai.models.generateContent({
+    const response = await getAiClient().models.generateContent({
       model: TEXT_MODEL_NAME,
       contents: {
         parts: [
-          { 
-            inlineData: { 
-              data: cleanBase64, 
-              mimeType: mimeType 
-            } 
+          {
+            inlineData: {
+              data: cleanBase64,
+              mimeType: mimeType
+            }
           },
-          { 
-            text: "Describe this image in extreme detail as a stable diffusion prompt. Focus on the subject's appearance, clothing, lighting, background, art style, camera angle, and color palette. Output ONLY the prompt text, no conversational filler." 
+          {
+            text: "Describe this image in extreme detail as a stable diffusion prompt. Focus on the subject's appearance, clothing, lighting, background, art style, camera angle, and color palette. Output ONLY the prompt text, no conversational filler."
           }
         ]
       }
@@ -162,13 +167,13 @@ interface CharacterAttributes {
 }
 
 export const generateCharacterPrompt = async (
-  headshotBase64: string | null, 
-  bodyshotBase64: string | null, 
+  headshotBase64: string | null,
+  bodyshotBase64: string | null,
   attributes: CharacterAttributes
 ): Promise<string> => {
-  
+
   const parts: any[] = [];
-  
+
   if (headshotBase64) {
     const cleanHead = headshotBase64.replace(/^data:(.*,)?/, '');
     // Simple mimetype guess or pass in. Assuming jpeg/png works generally.
@@ -216,11 +221,11 @@ export const generateCharacterPrompt = async (
   parts.push({ text: promptText });
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await getAiClient().models.generateContent({
       model: TEXT_MODEL_NAME, // gemini-2.5-flash is multimodal capable
       contents: { parts }
     });
-    
+
     return response.candidates?.[0]?.content?.parts?.[0]?.text || "Failed to generate prompt.";
   } catch (error) {
     console.error("Gemini Character Prompt Error:", error);
