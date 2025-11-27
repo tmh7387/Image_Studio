@@ -1,0 +1,5 @@
+{
+  "name": "NanoBanana Studio",
+  "description": "A high-performance AI image generator and editor using the Gemini NanoBanana model.",
+  "requestFramePermissions": []
+}
