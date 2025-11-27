@@ -32,6 +32,7 @@ export const CharacterPromptGenerator: React.FC<CharacterPromptGeneratorProps> =
   const [shotType, setShotType] = useState<'Headshot' | 'Full Body'>('Headshot');
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [isSaved, setIsSaved] = useState(false);
 
   const headshotInputRef = useRef<HTMLInputElement>(null);
   const bodyshotInputRef = useRef<HTMLInputElement>(null);
@@ -77,6 +78,7 @@ export const CharacterPromptGenerator: React.FC<CharacterPromptGeneratorProps> =
     
     setIsGeneratingImage(true);
     setGeneratedImage(null);
+    setIsSaved(false);
 
     // Enforce constraints: Clean background + Shot type
     const visualPrompt = `${generatedPrompt}. \n\nCOMPOSITION: Professional ${shotType}, clean solid neutral background, studio lighting, high resolution, photorealistic.`;
@@ -86,9 +88,6 @@ export const CharacterPromptGenerator: React.FC<CharacterPromptGeneratorProps> =
         prompt: visualPrompt,
         style: ArtStyle.PHOTOREALISTIC,
         aspectRatio: shotType === 'Full Body' ? AspectRatio.TALL_9_16 : AspectRatio.SQUARE,
-        // We use the inputs as loose references if provided, or rely purely on the text description
-        // For this workflow, let's rely on the rich text prompt we just generated, 
-        // as it theoretically contains the distilled essence of the inputs.
       };
 
       const result = await generateContent(config);
@@ -112,7 +111,8 @@ export const CharacterPromptGenerator: React.FC<CharacterPromptGeneratorProps> =
       type: 'generation', // It's effectively a generation now
       timestamp: Date.now()
     });
-    alert("Saved Image to Gallery!");
+    setIsSaved(true);
+    setTimeout(() => setIsSaved(false), 2000);
   };
 
   const copyToClipboard = () => {
@@ -272,12 +272,13 @@ export const CharacterPromptGenerator: React.FC<CharacterPromptGeneratorProps> =
 
            {generatedImage && (
              <Button 
-               variant="glass" 
-               className="w-full"
+               variant={isSaved ? "primary" : "glass"}
+               className={`w-full transition-all ${isSaved ? 'bg-emerald-600 border-emerald-500' : ''}`}
                onClick={handleSaveToGallery}
-               icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>}
+               disabled={isSaved}
+               icon={isSaved ? <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg> : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>}
              >
-               Save Image
+               {isSaved ? "Saved!" : "Save Image"}
              </Button>
            )}
         </div>
