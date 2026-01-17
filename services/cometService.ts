@@ -34,6 +34,9 @@ export const generateContent = async (config: GenerationConfig): Promise<Generat
     // Check if it's Doubao (OpenAI Compatible Image Endpoint)
     const isOpenAIImageModel = config.model?.includes('doubao');
 
+    // Extract reference image (Manual Upload usually takes precedence if set, otherwise DNA ref)
+    const refImage = config.base64Image || config.characterReferenceImage;
+
     if (isOpenAIImageModel) {
         // --- DOUBAO IMPLEMENTATION (OpenAI Standard) ---
         const model = config.model || AIModel.DOUBAO_SEEDREAM;
@@ -46,6 +49,25 @@ export const generateContent = async (config: GenerationConfig): Promise<Generat
         if (config.aspectRatio === "4:5") size = "1024x1280";
         if (config.aspectRatio === "3:2") size = "1280x853";
 
+        const requestBody: any = {
+            model: model,
+            prompt: config.prompt + (config.style ? ` style of ${config.style}` : ""),
+            n: 1,
+            size: size,
+            response_format: "url"
+        };
+
+        // Add Reference Image if present (Aggregator standard for Img2Img)
+        if (refImage) {
+            // Clean base64 if needed, usually full data URI is fine for 'image_url' or just base64 for 'image'
+            // Attempting 'image_url' pattern (common in aggregators) or 'image'
+            // Using standard OpenAI 'image' for variations/edits, but this is 'generations'.
+            // Many Chinese aggregators use 'image_url' or 'ref_image_url'
+            // We will try standard 'image_url'
+            const cleanBase64 = refImage.includes('base64,') ? refImage : `data:image/jpeg;base64,${refImage}`;
+            requestBody.image_url = cleanBase64;
+        }
+
         try {
             const response = await fetch(endpoint, {
                 method: "POST",
@@ -53,13 +75,7 @@ export const generateContent = async (config: GenerationConfig): Promise<Generat
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${apiKey}`
                 },
-                body: JSON.stringify({
-                    model: model,
-                    prompt: config.prompt + (config.style ? ` style of ${config.style}` : ""),
-                    n: 1,
-                    size: size,
-                    response_format: "url"
-                })
+                body: JSON.stringify(requestBody)
             });
 
             const data = await response.json();
@@ -89,12 +105,29 @@ export const generateContent = async (config: GenerationConfig): Promise<Generat
         aspectRatio = "1:1"; // Fallback
     }
 
+    // Construct Parts
+    const parts: any[] = [
+        { text: config.prompt + (config.style ? ` in style of ${config.style}` : "") }
+    ];
+
+    // Add Reference Image part (Multimodal Input)
+    if (refImage) {
+        const base64Data = refImage.replace(/^data:image\/[a-z]+;base64,/, "");
+        const mimeMatch = refImage.match(/^data:(image\/[a-z]+);base64,/);
+        const mimeType = mimeMatch ? mimeMatch[1] : "image/jpeg";
+
+        parts.push({
+            inlineData: {
+                mimeType: mimeType,
+                data: base64Data
+            }
+        });
+    }
+
     const payload = {
         contents: [
             {
-                parts: [
-                    { text: config.prompt + (config.style ? ` in style of ${config.style}` : "") }
-                ]
+                parts: parts
             }
         ],
         generationConfig: {
@@ -128,8 +161,8 @@ export const generateContent = async (config: GenerationConfig): Promise<Generat
         const candidate = data.candidates?.[0];
         if (!candidate) throw new Error("No candidates returned");
 
-        const parts = candidate.content?.parts || [];
-        const imagePart = parts.find((p: any) => p.inlineData || (p.image && p.image.format));
+        const responseParts = candidate.content?.parts || [];
+        const imagePart = responseParts.find((p: any) => p.inlineData || (p.image && p.image.format));
 
         if (imagePart && imagePart.inlineData) {
             // Construct Data URL
@@ -139,7 +172,7 @@ export const generateContent = async (config: GenerationConfig): Promise<Generat
         }
 
         // Fallback: Check if there's text with a URL (unlikely for strict image mode but possible)
-        const textPart = parts.find((p: any) => p.text);
+        const textPart = responseParts.find((p: any) => p.text);
         if (textPart) {
             // Try extract URL
             const urlMatch = textPart.text.match(/(https?:\/\/[^\s)]+)/);
