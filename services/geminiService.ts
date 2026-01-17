@@ -5,7 +5,9 @@ import { ArtStyle, AspectRatio, GenerationConfig, GenerationResult } from "../ty
 // Initialize the client
 // Initialize the client lazily or with a placeholder to prevent crash on load
 const getAiClient = () => {
-  const apiKey = process.env.API_KEY || "PLACEHOLDER_KEY_FOR_UI_RENDERING";
+  const localStorageKey = localStorage.getItem('gemini_api_key');
+  const envKey = (import.meta as any).env.VITE_GEMINI_API_KEY || process.env.API_KEY; // Fallback to either env var
+  const apiKey = localStorageKey || envKey || "PLACEHOLDER_KEY_FOR_UI_RENDERING";
   return new GoogleGenAI({ apiKey });
 };
 // const ai = new GoogleGenAI({ apiKey: process.env.API_KEY }); // OLD CRASHING CODE
@@ -45,15 +47,16 @@ export const generateContent = async (config: GenerationConfig): Promise<Generat
     parts.push({
       inlineData: {
         data: cleanCharBase64,
-        mimeType: "image/png", // Assuming PNG/JPEG, API is flexible
+        mimeType: "image/png",
       },
     });
-    promptPrefix += "Image 1 is the CHARACTER IDENTITY REFERENCE (Face Source). ";
+    promptPrefix += "Image 1 is the CHARACTER VISUAL ANCHOR (Face/Identity Source). Maintain this exact identity. ";
   }
 
-  // 2. Handle Image Input (Source Image)
+  // 2. Handle Image Input (Source Image/Scene/Pose)
   if (base64Image && mimeType) {
     const cleanBase64 = base64Image.replace(/^data:(.*,)?/, '');
+    const imgIndex = characterReferenceImage ? 2 : 1;
     parts.push({
       inlineData: {
         data: cleanBase64,
@@ -63,13 +66,13 @@ export const generateContent = async (config: GenerationConfig): Promise<Generat
 
     // Logic branching based on Task Type
     if (taskType === 'editing') {
-      promptPrefix += "Perform the following EDIT on the provided image. Maintain the original structure, lighting, and background unless told otherwise. Instruction: ";
+      promptPrefix += `Image ${imgIndex} is the image to EDIT. Instruction: `;
     } else {
       // Standard Generation with Reference
       if (characterReferenceImage) {
-        promptPrefix += "Image 2 is the POSE/COMPOSITION TARGET (Body Source). TASK: Create a new image where you replace the face/identity of the person in Image 2 with the face/identity of the person in Image 1. Maintain the exact pose, lighting, clothing, background, and style of Image 2. DO NOT simply output Image 2. You MUST apply the facial features from Image 1. ";
+        promptPrefix += `Image ${imgIndex} is the POSE/COMPOSITION TARGET. Transfer the character from Image 1 into the scene/pose of Image ${imgIndex}. `;
       } else {
-        promptPrefix += "Use this image as a visual reference for composition and structure. ";
+        promptPrefix += `Use Image ${imgIndex} as a visual reference for composition and structure. `;
       }
     }
   }
@@ -229,6 +232,63 @@ export const generateCharacterPrompt = async (
     return response.candidates?.[0]?.content?.parts?.[0]?.text || "Failed to generate prompt.";
   } catch (error) {
     console.error("Gemini Character Prompt Error:", error);
+    throw error;
+  }
+};
+
+export const analyzeCharacterImage = async (base64Image: string): Promise<any> => {
+  const cleanBase64 = base64Image.replace(/^data:(.*,)?/, '');
+
+  const prompt = `
+    You are an expert character designer. Analyze the provided image and extract a JSON profile (NO markdown). 
+    Accurately estimate the:
+    - Age Range (e.g., "Late 20s", "Mid 40s")
+    - Gender
+    - Ethnicity
+    - Body Somatotype (using standard terms like Ectomorph/Mesomorph or descriptive terms like Athletic/Curvy)
+    - List 3 distinct facial features
+    - Identify the Clothing Style shown.
+
+    Output STRICT JSON format:
+    {
+      "bio": {
+        "ageRange": "string",
+        "gender": "string",
+        "ethnicity": "string",
+        "bodySomatotype": "string",
+        "facialFeatures": ["string", "string", "string"]
+      },
+      "stylePreferences": {
+        "clothingStyle": ["string"]
+      }
+    }
+  `;
+
+  try {
+    const response = await getAiClient().models.generateContent({
+      model: TEXT_MODEL_NAME,
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              data: cleanBase64,
+              mimeType: "image/png" // Assuming PNG/JPEG generic handling
+            }
+          },
+          { text: prompt }
+        ]
+      }
+    });
+
+    const text = response.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) throw new Error("No response from analysis model");
+
+    // Clean markdown code blocks if present
+    const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    return JSON.parse(cleanText);
+
+  } catch (error) {
+    console.error("Character Analysis Error:", error);
     throw error;
   }
 };

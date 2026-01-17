@@ -23,6 +23,20 @@ export enum AspectRatio {
   LANDSCAPE_3_2 = "3:2",
 }
 
+export enum AIProvider {
+  GOOGLE = "Google Gemini Native",
+  COMET = "CometAPI (Aggregator)"
+}
+
+export enum AIModel {
+  GEMINI_2_5_FLASH = "gemini-2.5-flash",
+  GEMINI_2_5_FLASH_IMAGE = "gemini-2.5-flash-image",
+  // Comet Specific
+  GEMINI_3_PRO_IMAGE = "gemini-3-pro-image",
+  DOUBAO_SEEDREAM = "doubao-seedream-4-5-251128",
+  GROK_4_FAST = "grok-4-fast-non-reasoning"
+}
+
 export interface GenerationConfig {
   prompt: string;
   style: ArtStyle;
@@ -32,6 +46,10 @@ export interface GenerationConfig {
   characterReferenceImage?: string; // For Character Consistency (The "Trained" face)
   characterStrength?: 'low' | 'medium' | 'high';
   taskType?: 'generation' | 'editing'; // New field for Editing tasks
+
+  // Provider Config
+  provider?: AIProvider;
+  model?: string; // specific model override
 }
 
 export interface GenerationResult {
@@ -39,16 +57,37 @@ export interface GenerationResult {
   text?: string;
 }
 
-export interface Influencer {
+export interface CharacterDNA {
+  id: string | number;
+  name: string;
+  createdAt: number;
+  anchorImage: string; // Base64 or URL
+
+  bio: {
+    ageRange: string;
+    gender: string;
+    ethnicity: string;
+    bodySomatotype: string;
+    facialFeatures: string[];
+  };
+
+  stylePreferences: {
+    clothingStyle: string[];
+    defaultAccessories: string[];
+  };
+}
+
+// Backward compatibility or legacy type
+export interface Influencer extends Partial<CharacterDNA> {
   id: string | number;
   name: string;
   description?: string;
   gender?: string;
   imageColor?: string;
-  avatarUrl?: string; // Used as the primary anchor/reference image
-  trainingImages?: string[]; // Store the full set if needed for future advanced features
-  
-  // Physical Attributes
+  avatarUrl?: string;
+  trainingImages?: string[];
+
+  // Physical Attributes (Legacy flattened)
   characterStyle?: string;
   age?: string;
   ethnicity?: string;

@@ -18,7 +18,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   gallery = [],
   onDeleteFromGallery
 }) => {
-  const [nanoBananaPrompt, setNanoBananaPrompt] = useState("");
+  const [canvasPrompt, setCanvasPrompt] = useState("");
   const [openMenuId, setOpenMenuId] = useState<string | number | null>(null);
   const [filterType, setFilterType] = useState<string>('all');
   const menuRef = useRef<HTMLDivElement>(null);
@@ -150,7 +150,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <span className="text-xs opacity-50">›</span>
                   </button>
                   <button
-                    onClick={() => onNavigate('nano-banana', { influencerId: inf.id })}
+                    onClick={() => onNavigate('canvas-studio', { influencerId: inf.id })}
                     className="w-full flex items-center justify-between p-3 bg-slate-800/50 rounded-lg text-slate-300 hover:bg-slate-800 transition-colors text-sm hover:text-white group"
                   >
                     <div className="flex items-center">
@@ -179,7 +179,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="h-48 bg-slate-800 relative overflow-hidden">
               {/* Placeholder Art */}
               <div className="absolute inset-0 bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center">
-                <div className="text-6xl">🍌</div>
+                <div className="text-6xl">🎨</div>
               </div>
               <div className="absolute inset-0 bg-gradient-to-t from-[#1a1f2e] to-transparent opacity-90"></div>
               <div className="absolute bottom-3 left-3 right-3">
@@ -188,11 +188,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     type="text"
                     placeholder="he crosses arms..."
                     className="bg-transparent border-none text-xs text-white w-full focus:outline-none px-2"
-                    value={nanoBananaPrompt}
-                    onChange={(e) => setNanoBananaPrompt(e.target.value)}
+                    value={canvasPrompt}
+                    onChange={(e) => setCanvasPrompt(e.target.value)}
                   />
                   <button
-                    onClick={() => onNavigate('nano-banana', { prompt: nanoBananaPrompt })}
+                    onClick={() => onNavigate('canvas-studio', { prompt: canvasPrompt })}
                     className="bg-indigo-600 text-xs text-white px-3 py-1 rounded hover:bg-indigo-500"
                   >
                     Generate
@@ -203,7 +203,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="p-4">
               <div className="flex items-center mb-1">
                 <svg className="w-4 h-4 text-slate-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                <h3 className="font-semibold text-white">Nano Banana</h3>
+                <h3 className="font-semibold text-white">Canvas Studio</h3>
               </div>
             </div>
           </div>
@@ -285,8 +285,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 key={type}
                 onClick={() => setFilterType(type)}
                 className={`px-3 py-1 text-xs rounded-full border transition-all ${filterType === type
-                    ? 'bg-indigo-600 border-indigo-500 text-white'
-                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white'
+                  ? 'bg-indigo-600 border-indigo-500 text-white'
+                  : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white'
                   }`}
               >
                 {type.charAt(0).toUpperCase() + type.slice(1).replace('-', ' ')}

@@ -1,6 +1,6 @@
-# NanoBanana Studio - Architecture & Feature Documentation
+# Character Canvas - Architecture & Feature Documentation
 
-NanoBanana Studio is a client-side AI creative suite built with React and powered by Google's Gemini 2.5 Flash models. It focuses on character consistency ("Influencers"), image generation, and workflow tools for AI artists.
+Character Canvas is a client-side AI creative suite built with React and powered by Google's Gemini 2.5 Flash models. It focuses on character consistency ("Influencers"), image generation, and workflow tools for AI artists.
 
 ## 1. Tech Stack
 
@@ -22,7 +22,7 @@ NanoBanana Studio is a client-side AI creative suite built with React and powere
   - Displays Gallery of generated images.
   - Quick actions to delete items or start new workflows.
 
-### 2. NanoBanana Studio (Image Generator)
+### 2. Canvas Studio (Image Generator)
 - **Purpose**: Primary text-to-image and image-to-image workspace.
 - **Key Capabilities**:
   - **Text-to-Image**: Generate images from prompts with selectable Art Styles (e.g., Photorealistic, Anime, Cyberpunk).

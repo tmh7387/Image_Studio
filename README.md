@@ -1,11 +1,11 @@
-# NanoBanana Studio 🍌
+# Character Canvas 🎨
 
-NanoBanana Studio is a powerful AI-powered creative suite built with React, Vite, and Google's Gemini models. It allows users to generate images, create consistent characters (influencers), perform face swaps, and more, all within a modern, responsive interface.
+ImCharacter Canvas is a powerful AI-powered creative suite built with React, Vite, and Google's Gemini models. It allows users to generate images, create consistent characters (influencers), perform face swaps, and more, all within a modern, responsive interface.
 
 ## Features
 
 *   **Dashboard**: Central hub to manage your creations and characters.
-*   **NanoBanana Studio**: Advanced image generation using `gemini-2.5-flash-image`. Supports various art styles and aspect ratios.
+*   **Canvas Studio**: Advanced image generation using `gemini-2.5-flash-image`. Supports various art styles and aspect ratios.
 *   **Character Creator**: Define and save custom "Influencers" with specific physical attributes and styles to ensure consistency across generations.
 *   **Character Transfer**: Generatively insert your saved character identities into new scenes or poses.
 *   **Image to Prompt**: Reverse engineer prompts from existing images to understand how to recreate styles.

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Dashboard } from './components/Dashboard';
-import { NanoBananaStudio } from './components/NanoBananaStudio';
+import { CanvasStudio } from './components/CanvasStudio';
 import { CharacterCreator } from './components/CharacterCreator';
 import { FaceSwap } from './components/FaceSwap';
 import { ImageToPrompt } from './components/ImageToPrompt';
@@ -9,12 +9,14 @@ import { CharacterSheetGenerator } from './components/CharacterSheetGenerator';
 import { ImageEditor } from './components/ImageEditor';
 import { CharacterPromptGenerator } from './components/CharacterPromptGenerator';
 import { Influencer, GalleryItem } from './types';
+import { SettingsModal } from './components/SettingsModal';
 
-type View = 'dashboard' | 'nano-banana' | 'create-character' | 'face-swap' | 'image-to-prompt' | 'character-sheet' | 'image-editor' | 'character-prompt';
+type View = 'dashboard' | 'canvas-studio' | 'create-character' | 'face-swap' | 'image-to-prompt' | 'character-sheet' | 'image-editor' | 'character-prompt';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
-  
+  const [showSettings, setShowSettings] = useState(false);
+
   // Navigation State transfer
   const [studioPrompt, setStudioPrompt] = useState<string>('');
   const [studioInitialImage, setStudioInitialImage] = useState<string | null>(null);
@@ -124,27 +126,27 @@ const App: React.FC = () => {
     switch (currentView) {
       case 'dashboard':
         return (
-          <Dashboard 
-            onNavigate={handleNavigate} 
+          <Dashboard
+            onNavigate={handleNavigate}
             influencers={influencers}
             onDeleteInfluencer={handleDeleteInfluencer}
             gallery={gallery}
             onDeleteFromGallery={handleDeleteFromGallery}
           />
         );
-      
+
       case 'create-character':
         return (
-          <CharacterCreator 
-            onBack={() => setCurrentView('dashboard')} 
+          <CharacterCreator
+            onBack={() => setCurrentView('dashboard')}
             onCharacterCreated={handleCharacterCreated}
             initialData={editingInfluencer || undefined}
           />
         );
-      
-      case 'nano-banana':
+
+      case 'canvas-studio':
         return (
-          <NanoBananaStudio 
+          <CanvasStudio
             onBack={() => setCurrentView('dashboard')}
             initialPrompt={studioPrompt}
             initialBase64Image={studioInitialImage}
@@ -154,10 +156,10 @@ const App: React.FC = () => {
             onDeleteFromGallery={handleDeleteFromGallery}
           />
         );
-      
+
       case 'face-swap':
         return (
-          <FaceSwap 
+          <FaceSwap
             onBack={() => setCurrentView('dashboard')}
             influencers={influencers}
             initialInfluencer={activeInfluencer}
@@ -169,11 +171,11 @@ const App: React.FC = () => {
 
       case 'image-to-prompt':
         return (
-          <ImageToPrompt 
+          <ImageToPrompt
             onBack={() => setCurrentView('dashboard')}
             onUsePrompt={(prompt) => {
-               setStudioPrompt(prompt);
-               setCurrentView('nano-banana');
+              setStudioPrompt(prompt);
+              setCurrentView('canvas-studio');
             }}
             onAddToGallery={handleAddToGallery}
           />
@@ -196,7 +198,7 @@ const App: React.FC = () => {
             onAddToGallery={handleAddToGallery}
           />
         );
-      
+
       case 'character-prompt':
         return (
           <CharacterPromptGenerator
@@ -214,23 +216,36 @@ const App: React.FC = () => {
     <div className="min-h-screen pb-10">
       <header className="px-6 py-4 bg-slate-900/50 backdrop-blur-md border-b border-white/5 sticky top-0 z-50">
         <div className="max-w-[1600px] mx-auto flex items-center justify-between">
-          <div 
+          <div
             className="flex items-center space-x-2 cursor-pointer"
             onClick={() => setCurrentView('dashboard')}
           >
-            <span className="text-3xl">🍌</span>
-            <h1 className="text-xl font-bold bg-gradient-to-r from-yellow-400 to-yellow-600 bg-clip-text text-transparent">
-              NanoBanana Studio
+            <span className="text-3xl">🎨</span>
+            <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-400 to-purple-500 bg-clip-text text-transparent">
+              Character Canvas
             </h1>
           </div>
           <div className="flex items-center space-x-4">
-             {/* User profile placeholder */}
-             <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold text-white border border-indigo-400">
-               JS
-             </div>
+            <button
+              onClick={() => setShowSettings(true)}
+              className="p-2 text-slate-400 hover:text-white transition-colors bg-slate-800/50 rounded-lg hover:bg-slate-700"
+              title="API Settings"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
+
+            {/* User profile placeholder */}
+            <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold text-white border border-indigo-400">
+              JS
+            </div>
           </div>
         </div>
       </header>
+
+      <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
 
       <main className="p-6">
         {renderView()}
