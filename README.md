@@ -7,7 +7,7 @@ NanoBanana Studio is a powerful AI-powered creative suite built with React, Vite
 *   **Dashboard**: Central hub to manage your creations and characters.
 *   **NanoBanana Studio**: Advanced image generation using `gemini-2.5-flash-image`. Supports various art styles and aspect ratios.
 *   **Character Creator**: Define and save custom "Influencers" with specific physical attributes and styles to ensure consistency across generations.
-*   **Face Swap**: Replace faces in images with your saved characters using AI.
+*   **Character Transfer**: Generatively insert your saved character identities into new scenes or poses.
 *   **Image to Prompt**: Reverse engineer prompts from existing images to understand how to recreate styles.
 *   **Character Sheet Generator**: Create consistent character reference sheets.
 *   **Image Editor**: (Feature in progress) Edit generated images.
@@ -62,7 +62,7 @@ NanoBanana Studio is a powerful AI-powered creative suite built with React, Vite
 
 1.  **Create a Character**: Go to "Create Character" to define your influencer's look.
 2.  **Generate Images**: Use the "NanoBanana Studio" to generate images. You can select your created character to maintain consistency.
-3.  **Face Swap**: Upload a target image and select a character to swap faces.
+3.  **Character Transfer**: Upload a reference scene and select a character to transfer their identity while maintaining the scene's composition.
 4.  **Gallery**: Your creations are saved locally to your browser's LocalStorage.
 
 ## Project Structure
