@@ -43,11 +43,12 @@ export const generateContent = async (config: GenerationConfig): Promise<Generat
         const endpoint = `${COMET_API_URL}/images/generations`;
 
         // Map Aspect Ratio to specific sizes if needed, or use default logic
-        let size = "1024x1024";
-        if (config.aspectRatio === "16:9") size = "1792x1024";
-        if (config.aspectRatio === "9:16") size = "1024x1792";
-        if (config.aspectRatio === "4:5") size = "1024x1280";
-        if (config.aspectRatio === "3:2") size = "1280x853";
+        // Minimum 3,686,400 pixels required (same as Gemini 3)
+        let size = "1920x1920";
+        if (config.aspectRatio === "16:9") size = "2560x1440";
+        if (config.aspectRatio === "9:16") size = "1440x2560";
+        if (config.aspectRatio === "4:5") size = "1728x2160";
+        if (config.aspectRatio === "3:2") size = "2352x1568";
 
         const requestBody: any = {
             model: model,
