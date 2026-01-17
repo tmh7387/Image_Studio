@@ -1,20 +1,77 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# NanoBanana Studio 🍌
 
-# Run and deploy your AI Studio app
+NanoBanana Studio is a powerful AI-powered creative suite built with React, Vite, and Google's Gemini models. It allows users to generate images, create consistent characters (influencers), perform face swaps, and more, all within a modern, responsive interface.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/drive/1_j3qN4apFfhs4qmRBad3q74L9hpL0pW4
+*   **Dashboard**: Central hub to manage your creations and characters.
+*   **NanoBanana Studio**: Advanced image generation using `gemini-2.5-flash-image`. Supports various art styles and aspect ratios.
+*   **Character Creator**: Define and save custom "Influencers" with specific physical attributes and styles to ensure consistency across generations.
+*   **Face Swap**: Replace faces in images with your saved characters using AI.
+*   **Image to Prompt**: Reverse engineer prompts from existing images to understand how to recreate styles.
+*   **Character Sheet Generator**: Create consistent character reference sheets.
+*   **Image Editor**: (Feature in progress) Edit generated images.
+*   **Character Prompt Generator**: Generate detailed text prompts based on visual references and attributes.
 
-## Run Locally
+## Tech Stack
 
-**Prerequisites:**  Node.js
+*   **Frontend**: React 19, Vite, TypeScript
+*   **Styling**: Tailwind CSS
+*   **AI**: Google GenAI SDK (`@google/genai`)
+    *   Image Generation: `gemini-2.5-flash-image`
+    *   Text/Prompt Generation: `gemini-2.5-flash`
+*   **Persistence**: LocalStorage (Current)
 
+## Getting Started
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### Prerequisites
+
+*   Node.js (v18 or higher recommended)
+*   npm or yarn
+*   A Google Gemini API Key
+
+### Installation
+
+1.  Clone the repository:
+    ```bash
+    git clone <repository-url>
+    cd nanobanana-studio
+    ```
+
+2.  Install dependencies:
+    ```bash
+    npm install
+    ```
+
+3.  Configure Environment Variables:
+    *   Create a `.env` file in the root directory.
+    *   Add your Gemini API key:
+        ```env
+        VITE_GEMINI_API_KEY=your_api_key_here
+        ```
+    *   *Note: The current codebase might check `process.env.API_KEY` or similar. Ensure the service file `services/geminiService.ts` is using the correct environment variable format for Vite (`import.meta.env.VITE_...` or configured via `define` in vite config).*
+
+4.  Run the development server:
+    ```bash
+    npm run dev
+    ```
+
+5.  Open your browser and navigate to `http://localhost:5173` (or the port shown in the terminal).
+
+## Usage
+
+1.  **Create a Character**: Go to "Create Character" to define your influencer's look.
+2.  **Generate Images**: Use the "NanoBanana Studio" to generate images. You can select your created character to maintain consistency.
+3.  **Face Swap**: Upload a target image and select a character to swap faces.
+4.  **Gallery**: Your creations are saved locally to your browser's LocalStorage.
+
+## Project Structure
+
+*   `src/components`: React components for each feature (Dashboard, Studio, etc.).
+*   `src/services`: API integration logic (Gemini service).
+*   `src/types.ts`: TypeScript definitions for data models.
+*   `App.tsx`: Main application routing and state management.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
