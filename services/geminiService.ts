@@ -1,6 +1,8 @@
 
+
 import { GoogleGenAI } from "@google/genai";
-import { ArtStyle, AspectRatio, GenerationConfig, GenerationResult } from "../types";
+import { ArtStyle, AspectRatio, GenerationConfig, GenerationResult, CharacterDNA } from "../types";
+import { logError } from "../utils/errorHandler";
 
 // Initialize the client
 // Initialize the client lazily or with a placeholder to prevent crash on load
@@ -126,7 +128,7 @@ export const generateContent = async (config: GenerationConfig): Promise<Generat
     return { imageUrl, text: textResponse };
 
   } catch (error) {
-    console.error("Gemini API Error:", error);
+    logError(error, "Gemini API - generateContent");
     throw error;
   }
 };
@@ -154,7 +156,7 @@ export const describeImage = async (base64Image: string, mimeType: string): Prom
 
     return response.candidates?.[0]?.content?.parts?.[0]?.text || "Failed to generate description.";
   } catch (error) {
-    console.error("Gemini Describe Error:", error);
+    logError(error, "Gemini API - describeImage");
     throw error;
   }
 };
@@ -231,35 +233,49 @@ export const generateCharacterPrompt = async (
 
     return response.candidates?.[0]?.content?.parts?.[0]?.text || "Failed to generate prompt.";
   } catch (error) {
-    console.error("Gemini Character Prompt Error:", error);
+    logError(error, "Gemini API - generateCharacterPrompt");
     throw error;
   }
 };
 
-export const analyzeCharacterImage = async (base64Image: string): Promise<any> => {
+/**
+ * IDENTITY FORGE: Step 1 - Vision Extraction
+ * Analyzes an uploaded image to create a semantic blueprint
+ * @returns CharacterDNA.blueprint structure
+ */
+export const analyzeCharacterImage = async (base64Image: string): Promise<CharacterDNA['blueprint']> => {
   const cleanBase64 = base64Image.replace(/^data:(.*,)?/, '');
 
   const prompt = `
-    You are an expert character designer. Analyze the provided image and extract a JSON profile (NO markdown). 
-    Accurately estimate the:
+    You are an expert character designer. Analyze the provided image and extract a detailed JSON profile (NO markdown code blocks). 
+    
+    Provide extremely detailed descriptions for:
     - Age Range (e.g., "Late 20s", "Mid 40s")
     - Gender
-    - Ethnicity
-    - Body Somatotype (using standard terms like Ectomorph/Mesomorph or descriptive terms like Athletic/Curvy)
-    - List 3 distinct facial features
-    - Identify the Clothing Style shown.
+    - Ethnicity (be specific, e.g., "Japanese-Brazilian", "Irish-American")
+    - Skin Complexion (detailed: "Olive skin with warm undertones", "Fair skin with cool pink undertones")
+    - Eye Details (shape, color, distinctive features: "Almond-shaped hazel eyes with golden flecks")
+    - Hair Details (length, texture, color: "Shoulder-length wavy dark brown hair with subtle highlights")
+    - Distinctive Features (at least 3: "Beauty mark above lip", "High cheekbones", "Defined jawline")
+    - Body Somatotype (Athletic, Curvy, Slender, etc.)
+    - Clothing Style visible in image (multiple tags: "Minimalist", "Streetwear", "Business Casual")
+    - Accessories visible (if any: "Gold hoop earrings", "Leather watch")
 
-    Output STRICT JSON format:
+    Output this EXACT JSON structure:
     {
-      "bio": {
+      "identity": {
         "ageRange": "string",
         "gender": "string",
         "ethnicity": "string",
-        "bodySomatotype": "string",
-        "facialFeatures": ["string", "string", "string"]
+        "skinComplexion": "string",
+        "eyeDetails": "string",
+        "hairDetails": "string",
+        "distinctiveFeatures": ["string", "string", "string"]
       },
-      "stylePreferences": {
-        "clothingStyle": ["string"]
+      "style": {
+        "bodySomatotype": "string",
+        "clothingStyle": ["string"],
+        "defaultAccessories": ["string"]
       }
     }
   `;
@@ -272,7 +288,7 @@ export const analyzeCharacterImage = async (base64Image: string): Promise<any> =
           {
             inlineData: {
               data: cleanBase64,
-              mimeType: "image/png" // Assuming PNG/JPEG generic handling
+              mimeType: "image/png"
             }
           },
           { text: prompt }
@@ -285,10 +301,122 @@ export const analyzeCharacterImage = async (base64Image: string): Promise<any> =
 
     // Clean markdown code blocks if present
     const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(cleanText);
+    return JSON.parse(cleanText) as CharacterDNA['blueprint'];
 
   } catch (error) {
-    console.error("Character Analysis Error:", error);
+    logError(error, "Gemini API - analyzeCharacterImage");
+    throw error;
+  }
+};
+
+/**
+ * IDENTITY FORGE: Step 2 - Generate Anchor Headshot
+ * Creates a 1:1 passport-style headshot with neutral expression and lighting
+ * @param headshotPrompt Custom prompt for headshot generation
+ * @returns Base64-encoded image string (1:1 aspect ratio)
+ */
+export const generateAnchorHeadshot = async (
+  headshotPrompt: string
+): Promise<string> => {
+  try {
+    const response = await getAiClient().models.generateContent({
+      model: MODEL_NAME,
+      contents: {
+        parts: [{ text: headshotPrompt }]
+      },
+      config: {
+        imageConfig: {
+          aspectRatio: "1:1",  // CRITICAL: Square format for passport photo
+        },
+      },
+    });
+
+    const candidate = response.candidates?.[0];
+    if (!candidate?.content?.parts) {
+      throw new Error("No image generated");
+    }
+
+    // Extract base64 image
+    for (const part of candidate.content.parts) {
+      if (part.inlineData) {
+        return `data:image/png;base64,${part.inlineData.data}`;
+      }
+    }
+
+    throw new Error("No image data in response");
+  } catch (error) {
+    logError(error, "Gemini API - generateAnchorHeadshot");
+    throw error;
+  }
+};
+
+/**
+ * IDENTITY FORGE: Step 3 - Generate Anchor Body
+ * Creates a 9:16 full-body neutral lookbook shot with PLAIN WHITE BACKGROUND
+ * Uses the headshot as a reference for facial consistency
+ * @param headshotBase64 The generated 1:1 headshot (for facial reference)
+ * @param fullBodyPrompt Custom prompt for full body generation
+ * @param headshotPrompt The headshot prompt for facial reference description
+ * @returns Base64-encoded image string (9:16 aspect ratio)
+ */
+export const generateAnchorBody = async (
+  headshotBase64: string,
+  fullBodyPrompt: string,
+  headshotPrompt: string
+): Promise<string> => {
+  try {
+    const parts: any[] = [];
+
+    // 1. Add headshot reference image FIRST
+    const cleanHeadBase64 = headshotBase64.replace(/^data:(.*,)?/, '');
+    parts.push({
+      inlineData: {
+        data: cleanHeadBase64,
+        mimeType: "image/png",
+      },
+    });
+
+    // 2. Combine prompts with explicit reference instruction
+    const combinedPrompt = `
+FACIAL CONSISTENCY INSTRUCTION:
+Image 1 is the CHARACTER VISUAL ANCHOR (headshot reference).
+Maintain this EXACT facial identity as described below:
+
+${headshotPrompt}
+
+---
+
+FULL BODY GENERATION:
+${fullBodyPrompt}
+`;
+
+    parts.push({ text: combinedPrompt });
+
+    const response = await getAiClient().models.generateContent({
+      model: MODEL_NAME,
+      contents: { parts },
+      config: {
+        imageConfig: {
+          aspectRatio: "9:16",  // CRITICAL: Tall format for full body
+        },
+      },
+    });
+
+    const candidate = response.candidates?.[0];
+    if (!candidate?.content?.parts) {
+      throw new Error("No image generated");
+    }
+
+    // Extract base64 image
+    for (const part of candidate.content.parts) {
+      if (part.inlineData) {
+        return `data:image/png;base64,${part.inlineData.data}`;
+      }
+    }
+
+    throw new Error("No image data in response");
+  } catch (error) {
+    logError(error, "Gemini API - generateAnchorBody");
     throw error;
   }
 };

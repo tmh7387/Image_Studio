@@ -1,5 +1,7 @@
 
-import { GenerationConfig, GenerationResult, AIModel } from "../types";
+
+import { GenerationConfig, GenerationResult, AIModel, AspectRatio } from "../types";
+import { logError } from "../utils/errorHandler";
 
 const getCometKey = () => localStorage.getItem('comet_api_key') || "";
 
@@ -32,110 +34,66 @@ export const generateContent = async (config: GenerationConfig): Promise<Generat
     if (!apiKey) throw new Error("Comet API Key missing. Please set it in Settings.");
 
     // Check if it's Doubao (OpenAI Compatible Image Endpoint)
+    // Flux is also often hosted via OpenAI-compatible image endpoint on aggregators
     const isOpenAIImageModel = config.model?.includes('doubao');
 
     // Extract reference image (Manual Upload usually takes precedence if set, otherwise DNA ref)
     const refImage = config.base64Image || config.characterReferenceImage;
 
     if (isOpenAIImageModel) {
-        // --- DOUBAO IMPLEMENTATION ---
-        // If we have a reference image, we MUST use the Chat/Vision endpoint for Image-to-Image
-        // Otherwise, standard Image Generation endpoint is preferred for Text-to-Image
-        const useVisionEndpoint = !!refImage;
-
+        // --- OPENAI COMPATIBLE IMAGE ENDPOINT (Doubao / Flux) ---
         const model = config.model || AIModel.DOUBAO_SEEDREAM;
 
-        // Map dimensions
+        // Doubao requires High Resolution (>3.6MP)
         let size = "1920x1920";
-        if (config.aspectRatio === "16:9") size = "2560x1440";
-        if (config.aspectRatio === "9:16") size = "1440x2560";
-        if (config.aspectRatio === "4:5") size = "1728x2160";
-        if (config.aspectRatio === "3:2") size = "2352x1568";
+        if (config.aspectRatio === AspectRatio.WIDE_16_9) size = "2560x1440";
+        if (config.aspectRatio === AspectRatio.TALL_9_16) size = "1440x2560";
+        if (config.aspectRatio === AspectRatio.SQUARE) size = "1920x1920";
 
-        if (useVisionEndpoint && refImage) {
-            // VISION/CHAT PAYLOAD (Img2Img)
-            const endpoint = `${COMET_API_URL}/chat/completions`;
-            const cleanBase64 = refImage.includes('base64,') ? refImage : `data:image/jpeg;base64,${refImage}`;
+        // IMPORTANT: Doubao Seedream via Comet does NOT appear to support /chat/completions for Img2Img (Vision)
+        // We use /images/generations (Text-to-Image).
+        // Attempting to pass reference image via 'image_url' parameter (common aggregator pattern).
 
-            const payload = {
-                model: model,
-                messages: [
-                    {
-                        role: "user",
-                        content: [
-                            { type: "text", text: config.prompt + (config.style ? ` style of ${config.style}` : "") },
-                            { type: "image_url", image_url: { url: cleanBase64 } }
-                        ]
-                    }
-                ],
-                // Pass size as extra param if supported, otherwise rely on model default or prompt
-                width: parseInt(size.split('x')[0]),
-                height: parseInt(size.split('x')[1])
-            };
+        const endpoint = `${COMET_API_URL}/images/generations`;
 
-            try {
-                const response = await fetch(endpoint, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${apiKey}`
-                    },
-                    body: JSON.stringify(payload)
-                });
+        const payload: any = {
+            model: model,
+            prompt: config.prompt + (config.style ? ` style of ${config.style}` : ""),
+            n: 1,
+            size: size,
+            response_format: "url"
+        };
 
-                const data = await response.json();
-                if (!response.ok) throw new Error(`CometAPI (Doubao Vision) Error: ${data.error?.message || response.statusText}`);
-
-                // Parse Chat Response for Image URL
-                let imageUrl = data.data?.[0]?.url; // Some return it here mixed in
-                if (!imageUrl && data.choices?.[0]?.message?.content) {
-                    // Try to extract URL from content
-                    const content = data.choices[0].message.content;
-                    const match = content.match(/\((https?:\/\/.*?)\)/) || content.match(/(https?:\/\/[^\s)]+)/);
-                    if (match) imageUrl = match[1] || match[0];
-                }
-
-                // Fallback for some aggregators returning 'images' array
-                if (!imageUrl && data.images && data.images.length > 0) imageUrl = data.images[0].url;
-
-                if (!imageUrl) throw new Error("Doubao Vision generated a response but no image URL found.");
-
-                return { imageUrl };
-
-            } catch (error) {
-                console.error("Comet Doubao Vision Error:", error);
-                throw error;
+        if (refImage) {
+            // Check if it's a Data URI (Base64) vs Public URL
+            if (refImage.startsWith('data:')) {
+                // For Base64, many aggregators prefer 'image_base64' without prefix
+                const clean = refImage.replace(/^data:image\/[a-z]+;base64,/, "");
+                payload.image_base64 = clean;
+                payload.image_url = refImage; // Keep just in case
+            } else {
+                payload.image_url = refImage;
             }
+        }
 
-        } else {
-            // STANDARD IMAGE PAYLOAD (Txt2Img)
-            const endpoint = `${COMET_API_URL}/images/generations`;
+        try {
+            const response = await fetch(endpoint, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${apiKey}`
+                },
+                body: JSON.stringify(payload)
+            });
 
-            try {
-                const response = await fetch(endpoint, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${apiKey}`
-                    },
-                    body: JSON.stringify({
-                        model: model,
-                        prompt: config.prompt + (config.style ? ` style of ${config.style}` : ""),
-                        n: 1,
-                        size: size,
-                        response_format: "url"
-                    })
-                });
+            const data = await response.json();
+            if (!response.ok) throw new Error(`CometAPI Error (${model}): ${data.error?.message || response.statusText}`);
 
-                const data = await response.json();
-                if (!response.ok) throw new Error(`CometAPI (Doubao) Error: ${data.error?.message || response.statusText}`);
+            return { imageUrl: data.data?.[0]?.url };
 
-                return { imageUrl: data.data?.[0]?.url };
-
-            } catch (error) {
-                console.error("Comet Doubao Error:", error);
-                throw error;
-            }
+        } catch (error) {
+            logError(error, `Comet API - ${model}`);
+            throw error;
         }
     }
 
@@ -234,7 +192,7 @@ export const generateContent = async (config: GenerationConfig): Promise<Generat
         throw new Error("No image data found in response");
 
     } catch (error) {
-        console.error("Comet Gemini Logic Error:", error);
+        logError(error, "Comet API - Gemini Native");
         throw error;
     }
 };
@@ -302,7 +260,84 @@ export const analyzeCharacterImage = async (base64Image: string): Promise<any> =
         return JSON.parse(text);
 
     } catch (error) {
-        console.error("Comet Analysis Error:", error);
+        logError(error, "Comet API - analyzeCharacterImage");
+        throw error;
+    }
+};
+
+export const generateCharacterPrompt = async (
+    headshotBase64: string | null,
+    bodyshotBase64: string | null,
+    attributes: any
+): Promise<string> => {
+    const apiKey = getCometKey();
+    if (!apiKey) throw new Error("Comet API Key missing");
+
+    const model = AIModel.GROK_4_FAST; // Good localized text model
+
+    // Build constraints string
+    let constraints = "PHYSICAL ATTRIBUTES (Must be respected):";
+    if (attributes.gender) constraints += `\n- Gender: ${attributes.gender}`;
+    if (attributes.age) constraints += `\n- Age: ${attributes.age}`;
+    if (attributes.ethnicity) constraints += `\n- Ethnicity: ${attributes.ethnicity}`;
+    if (attributes.bodyType) constraints += `\n- Body Type: ${attributes.bodyType}`;
+    if (attributes.height) constraints += `\n- Height: ${attributes.height}`;
+    if (attributes.complexion) constraints += `\n- Complexion: ${attributes.complexion}`;
+    if (attributes.features && attributes.features !== 'None') constraints += `\n- Features: ${attributes.features}`;
+
+    const systemPrompt = `You are an expert prompt engineer for Stable Diffusion and Midjourney. 
+    Task: Create a highly detailed, descriptive character prompt based on the provided visual and text inputs.
+    Output: A single, dense paragraph. No filler. Focus on visual details.`;
+
+    const messages: any[] = [
+        { role: "system", content: systemPrompt }
+    ];
+
+    const contentParts: any[] = [
+        { type: "text", text: `Create a character prompt.\n${constraints}` }
+    ];
+
+    // Add visuals if present (Multimodal analysis + extraction)
+    if (headshotBase64) {
+        const clean = headshotBase64.replace(/^data:(.*,)?/, '');
+        contentParts.push({
+            type: "image_url",
+            image_url: { url: `data:image/jpeg;base64,${clean}` }
+        });
+        contentParts.push({ type: "text", text: "(Image 1: Face Reference)" });
+    }
+    if (bodyshotBase64) {
+        const clean = bodyshotBase64.replace(/^data:(.*,)?/, '');
+        contentParts.push({
+            type: "image_url",
+            image_url: { url: `data:image/jpeg;base64,${clean}` }
+        });
+        contentParts.push({ type: "text", text: "(Image 2: Body/Style Reference)" });
+    }
+
+    messages.push({ role: "user", content: contentParts });
+
+    try {
+        const response = await fetch(`${COMET_API_URL}/chat/completions`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: model,
+                messages: messages,
+                max_tokens: 1000
+            })
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error?.message || "Prompt generation failed");
+
+        return data.choices?.[0]?.message?.content || "No prompt generated.";
+
+    } catch (error) {
+        logError(error, "Comet API - generateCharacterPrompt");
         throw error;
     }
 };

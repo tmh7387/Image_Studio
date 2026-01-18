@@ -10,12 +10,16 @@ import { ImageEditor } from './components/ImageEditor';
 import { CharacterPromptGenerator } from './components/CharacterPromptGenerator';
 import { Influencer, GalleryItem } from './types';
 import { SettingsModal } from './components/SettingsModal';
+import { StorageMigration } from './components/StorageMigration';
+import { storageService } from './services/storageService';
 
 type View = 'dashboard' | 'canvas-studio' | 'create-character' | 'face-swap' | 'image-to-prompt' | 'character-sheet' | 'image-editor' | 'character-prompt';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [showSettings, setShowSettings] = useState(false);
+  const [showMigration, setShowMigration] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Navigation State transfer
   const [studioPrompt, setStudioPrompt] = useState<string>('');
@@ -23,44 +27,52 @@ const App: React.FC = () => {
   const [editingInfluencer, setEditingInfluencer] = useState<Influencer | null>(null);
   const [activeInfluencerId, setActiveInfluencerId] = useState<string | number | undefined>(undefined);
 
-  // --- State for Influencers with LocalStorage ---
-  const [influencers, setInfluencers] = useState<Influencer[]>(() => {
-    try {
-      const saved = localStorage.getItem('nanobanana_influencers');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      console.error("Failed to load influencers from storage", e);
-      return [];
-    }
-  });
+  // State for Influencers and Gallery (now using IndexedDB)
+  const [influencers, setInfluencers] = useState<Influencer[]>([]);
+  const [gallery, setGallery] = useState<GalleryItem[]>([]);
 
-  // --- State for Gallery with LocalStorage ---
-  const [gallery, setGallery] = useState<GalleryItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('nanobanana_gallery');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      console.error("Failed to load gallery from storage", e);
-      return [];
-    }
-  });
-
-  // --- Persistence Effects ---
+  // Initialize storage and load data
   useEffect(() => {
-    try {
-      localStorage.setItem('nanobanana_influencers', JSON.stringify(influencers));
-    } catch (error) {
-      console.error("Failed to save influencers (Quota Exceeded?):", error);
-    }
-  }, [influencers]);
+    const initializeStorage = async () => {
+      try {
+        // Initialize IndexedDB
+        await storageService.init();
 
-  useEffect(() => {
+        // Check if migration is needed
+        if (storageService.needsMigration()) {
+          setShowMigration(true);
+          setIsLoading(false);
+          return;
+        }
+
+        // Load data from IndexedDB
+        await loadData();
+      } catch (error) {
+        console.error('Failed to initialize storage:', error);
+        alert('Failed to load storage. The app may not work correctly.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeStorage();
+  }, []);
+
+  // Load data from IndexedDB
+  const loadData = async () => {
     try {
-      localStorage.setItem('nanobanana_gallery', JSON.stringify(gallery));
+      const [loadedInfluencers, loadedGallery] = await Promise.all([
+        storageService.getAllInfluencers(),
+        storageService.getAllGalleryItems()
+      ]);
+      setInfluencers(loadedInfluencers);
+      setGallery(loadedGallery);
     } catch (error) {
-      console.error("Failed to save gallery (Quota Exceeded?):", error);
+      console.error('Failed to load data:', error);
     }
-  }, [gallery]);
+  };
+
+
 
   // --- Handlers ---
 
@@ -84,41 +96,78 @@ const App: React.FC = () => {
     setCurrentView(view as View);
   };
 
-  const handleCharacterCreated = (newInfluencer: Influencer) => {
-    setInfluencers(prev => {
-      const exists = prev.findIndex(inf => inf.id === newInfluencer.id);
-      if (exists !== -1) {
-        // Update existing
-        const updated = [...prev];
-        updated[exists] = newInfluencer;
-        return updated;
-      }
-      // Add new
-      return [...prev, newInfluencer];
-    });
-    setEditingInfluencer(null); // Clear edit mode
-    setCurrentView('dashboard');
-  };
-
-  const handleDeleteInfluencer = (id: string | number) => {
-    if (window.confirm("Are you sure you want to delete this character? This cannot be undone.")) {
-      setInfluencers(prev => prev.filter(inf => inf.id !== id));
-      // Optionally clean up gallery items associated? We'll keep them for now.
+  const handleCharacterCreated = async (newInfluencer: Influencer) => {
+    try {
+      await storageService.saveInfluencer(newInfluencer);
+      // Reload  data to ensure consistency
+      await loadData();
+      setEditingInfluencer(null);
+      setCurrentView('dashboard');
+    } catch (error) {
+      console.error('Failed to save character:', error);
+      alert('Failed to save character. Please try again.');
     }
   };
 
-  const handleAddToGallery = (item: GalleryItem) => {
-    setGallery(prev => [item, ...prev]);
+  const handleDeleteInfluencer = async (id: string | number) => {
+    if (window.confirm("Are you sure you want to delete this character? This cannot be undone.")) {
+      try {
+        await storageService.deleteInfluencer(id);
+        await loadData();
+      } catch (error) {
+        console.error('Failed to delete character:', error);
+        alert('Failed to delete character. Please try again.');
+      }
+    }
   };
 
-  const handleDeleteFromGallery = (id: string) => {
+  const handleAddToGallery = async (item: GalleryItem) => {
+    try {
+      await storageService.saveGalleryItem(item);
+      await loadData();
+    } catch (error) {
+      console.error('Failed to save to gallery:', error);
+      alert('Failed to save to gallery. Storage may be full.');
+    }
+  };
+
+  const handleDeleteFromGallery = async (id: string) => {
     if (window.confirm("Delete this creation?")) {
-      setGallery(prev => prev.filter(item => item.id !== id));
+      try {
+        await storageService.deleteGalleryItem(id);
+        await loadData();
+      } catch (error) {
+        console.error('Failed to delete from gallery:', error);
+        alert('Failed to delete. Please try again.');
+      }
     }
   };
 
   // Helper to find the active influencer object
   const activeInfluencer = influencers.find(inf => inf.id === activeInfluencerId) || null;
+
+  // Handle migration completion
+  const handleMigrationComplete = async () => {
+    setShowMigration(false);
+    await loadData();
+  };
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show migration modal if needed
+  if (showMigration) {
+    return <StorageMigration onComplete={handleMigrationComplete} />;
+  }
 
   // --- Render Logic ---
 
