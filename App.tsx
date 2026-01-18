@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { CanvasStudio } from './components/CanvasStudio';
-import { CharacterCreator } from './components/CharacterCreator';
+import { CharacterCreatorV2 } from './components/CharacterCreatorV2';
 import { FaceSwap } from './components/FaceSwap';
 import { ImageToPrompt } from './components/ImageToPrompt';
 import { CharacterSheetGenerator } from './components/CharacterSheetGenerator';
@@ -186,7 +186,7 @@ const App: React.FC = () => {
 
       case 'create-character':
         return (
-          <CharacterCreator
+          <CharacterCreatorV2
             onBack={() => setCurrentView('dashboard')}
             onCharacterCreated={handleCharacterCreated}
             initialData={editingInfluencer || undefined}
