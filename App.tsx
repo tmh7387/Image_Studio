@@ -200,6 +200,7 @@ const App: React.FC = () => {
             initialPrompt={studioPrompt}
             initialBase64Image={studioInitialImage}
             activeInfluencer={activeInfluencer}
+            influencers={influencers}
             gallery={gallery}
             onAddToGallery={handleAddToGallery}
             onDeleteFromGallery={handleDeleteFromGallery}
