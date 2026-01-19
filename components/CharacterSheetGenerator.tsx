@@ -62,19 +62,43 @@ export const CharacterSheetGenerator: React.FC<CharacterSheetGeneratorProps> = (
     setGeneratedImage(null);
     setSelection(null);
 
-    // Construct Character Context
-    const attrs = [];
-    if (selectedInfluencer.gender) attrs.push(`Gender: ${selectedInfluencer.gender}`);
-    if (selectedInfluencer.age) attrs.push(`Age: ${selectedInfluencer.age}`);
-    if (selectedInfluencer.ethnicity) attrs.push(`Ethnicity: ${selectedInfluencer.ethnicity}`);
-    if (selectedInfluencer.bodyType) attrs.push(`Body: ${selectedInfluencer.bodyType}`);
-    if (selectedInfluencer.height) attrs.push(`Height: ${selectedInfluencer.height}`);
-    if (selectedInfluencer.complexion) attrs.push(`Complexion: ${selectedInfluencer.complexion}`);
-    if (selectedInfluencer.distinguishingFeatures && selectedInfluencer.distinguishingFeatures !== 'None') {
-      attrs.push(`Features: ${selectedInfluencer.distinguishingFeatures}`);
-    }
+    // Construct Character Context with Blueprint support
+    let charProfile = '';
 
-    const charProfile = `Character Name: ${selectedInfluencer.name}. Physical Attributes: [${attrs.join(', ')}]. ${selectedInfluencer.description || ''}`;
+    // NEW: Use CharacterDNA blueprint if available (better description)
+    if (selectedInfluencer.blueprint) {
+      const bp = selectedInfluencer.blueprint;
+      charProfile = `
+Character Name: ${selectedInfluencer.name}
+
+PHYSICAL IDENTITY (IMMUTABLE):
+- Age: ${bp.identity.ageRange}
+- Gender: ${bp.identity.gender}
+- Ethnicity: ${bp.identity.ethnicity}
+- Skin: ${bp.identity.skinComplexion}
+- Eyes: ${bp.identity.eyeDetails}
+- Hair: ${bp.identity.hairDetails}
+- Distinctive Features: ${bp.identity.distinctiveFeatures.join(', ')}
+
+DEFAULT STYLE:
+- Body Type: ${bp.style.bodySomatotype}
+- Clothing Style: ${bp.style.clothingStyle.join(', ')}
+- Accessories: ${bp.style.defaultAccessories.join(', ')}
+      `.trim();
+    } else {
+      // LEGACY: Fallback to old flattened attributes
+      const attrs = [];
+      if (selectedInfluencer.gender) attrs.push(`Gender: ${selectedInfluencer.gender}`);
+      if (selectedInfluencer.age) attrs.push(`Age: ${selectedInfluencer.age}`);
+      if (selectedInfluencer.ethnicity) attrs.push(`Ethnicity: ${selectedInfluencer.ethnicity}`);
+      if (selectedInfluencer.bodyType) attrs.push(`Body: ${selectedInfluencer.bodyType}`);
+      if (selectedInfluencer.height) attrs.push(`Height: ${selectedInfluencer.height}`);
+      if (selectedInfluencer.complexion) attrs.push(`Complexion: ${selectedInfluencer.complexion}`);
+      if (selectedInfluencer.distinguishingFeatures && selectedInfluencer.distinguishingFeatures !== 'None') {
+        attrs.push(`Features: ${selectedInfluencer.distinguishingFeatures}`);
+      }
+      charProfile = `Character Name: ${selectedInfluencer.name}. Physical Attributes: [${attrs.join(', ')}]. ${selectedInfluencer.description || ''}`;
+    }
 
     const sheetPrompt = `
       Create a professional detailed CHARACTER REFERENCE SHEET (Model Sheet) for the following character.
@@ -91,14 +115,20 @@ export const CharacterSheetGenerator: React.FC<CharacterSheetGeneratorProps> = (
       - BACKGROUND: Solid neutral white or light grey background (Clean Studio Lighting).
       - STYLE: ${style}. High resolution, consistent proportions, consistent clothing across all poses.
       - The image should look like a cohesive production asset for animation or game design.
+      - CRITICAL: Maintain EXACT facial consistency with the reference character throughout all 12 poses.
     `;
+
+    // Select best reference image (prioritize new CharacterDNA anchors)
+    const referenceImage = selectedInfluencer.anchorHeadshot ||
+      selectedInfluencer.anchorBody ||
+      selectedInfluencer.avatarUrl;
 
     try {
       const result = await generateContent({
         prompt: sheetPrompt,
         style: style as ArtStyle,
         aspectRatio: AspectRatio.WIDE_16_9,
-        characterReferenceImage: selectedInfluencer.avatarUrl,
+        characterReferenceImage: referenceImage,
         characterStrength: 'high',
         provider: selectedProvider,
         model: selectedModel
@@ -415,6 +445,7 @@ export const CharacterSheetGenerator: React.FC<CharacterSheetGeneratorProps> = (
                     src={generatedImage}
                     alt="Character Sheet"
                     draggable={false}
+                    crossOrigin="anonymous"
                     className="max-w-full max-h-[800px] block object-contain"
                   />
 
