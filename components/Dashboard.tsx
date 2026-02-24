@@ -1,7 +1,10 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from './Button';
 import { Influencer, GalleryItem } from '../types';
+import { storageService } from '../services/storageService';
+import { ImageLightbox } from './ImageLightbox';
 
 interface DashboardProps {
   onNavigate: (view: string, config?: any) => void;
@@ -18,10 +21,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
   gallery = [],
   onDeleteFromGallery
 }) => {
-  const [nanoBananaPrompt, setNanoBananaPrompt] = useState("");
+  const [canvasPrompt, setCanvasPrompt] = useState("");
   const [openMenuId, setOpenMenuId] = useState<string | number | null>(null);
   const [filterType, setFilterType] = useState<string>('all');
+  const [isExporting, setIsExporting] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -53,6 +59,52 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
+  // Export data
+  const handleExport = async () => {
+    try {
+      setIsExporting(true);
+      const jsonData = await storageService.exportData();
+
+      const blob = new Blob([jsonData], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `image-studio-backup-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Failed to export data. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Import data
+  const handleImport = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const result = await storageService.importData(text);
+      alert(`Import successful!\n${result.influencers} characters and ${result.gallery} gallery items imported.`);
+      window.location.reload(); // Reload to show imported data
+    } catch (error) {
+      console.error('Import failed:', error);
+      alert('Failed to import data. Please check the file format.');
+    } finally {
+      // Reset input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   const filteredGallery = filterType === 'all'
     ? gallery
     : gallery.filter(item => item.type === filterType);
@@ -61,20 +113,55 @@ export const Dashboard: React.FC<DashboardProps> = ({
     <div className="w-full max-w-[1600px] mx-auto animate-fade-in">
       {/* Section: Your AI Influencers */}
       <div className="mb-12">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
           <h2 className="text-2xl font-semibold text-white">Your AI Influencers</h2>
-          <Button
-            variant="primary"
-            size="md"
-            onClick={() => onNavigate('create-character')}
-            icon={
+          <div className="flex items-center gap-3">
+            {/* Export Button */}
+            <button
+              onClick={handleExport}
+              disabled={isExporting || (influencers.length === 0 && gallery.length === 0)}
+              className="px-4 py-2 text-sm bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-lg transition-colors flex items-center gap-2"
+              title="Export all data as JSON backup"
+            >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
-            }
-          >
-            Create AI Character
-          </Button>
+              {isExporting ? 'Exporting...' : 'Export'}
+            </button>
+
+            {/* Import Button */}
+            <button
+              onClick={handleImport}
+              className="px-4 py-2 text-sm bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors flex items-center gap-2"
+              title="Import data from JSON backup"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              Import
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+
+            {/* Create Button */}
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => onNavigate('create-character')}
+              icon={
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              }
+            >
+              Create AI Character
+            </Button>
+          </div>
         </div>
 
         {influencers.length === 0 ? (
@@ -95,11 +182,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center space-x-3">
                     <div className={`w-12 h-12 rounded-lg ${inf.imageColor || 'bg-slate-700'} flex items-center justify-center text-white font-bold shadow-inner overflow-hidden bg-cover bg-center`} >
-                      {inf.avatarUrl ? (
-                        <img src={inf.avatarUrl} alt={inf.name} className="w-full h-full object-cover" />
-                      ) : (
-                        inf.name.substring(0, 1).toUpperCase()
-                      )}
+                      {(() => {
+                        // Support both new CharacterDNA structure and legacy Influencer structure
+                        const thumbnailUrl = (inf as any).anchorHeadshot || inf.avatarUrl;
+                        return thumbnailUrl ? (
+                          <img src={thumbnailUrl} alt={inf.name} className="w-full h-full object-cover" />
+                        ) : (
+                          inf.name.substring(0, 1).toUpperCase()
+                        );
+                      })()}
                     </div>
                     <span className="font-medium text-lg text-slate-200">{inf.name}</span>
                   </div>
@@ -150,7 +241,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <span className="text-xs opacity-50">›</span>
                   </button>
                   <button
-                    onClick={() => onNavigate('nano-banana', { influencerId: inf.id })}
+                    onClick={() => onNavigate('canvas-studio', { influencerId: inf.id })}
                     className="w-full flex items-center justify-between p-3 bg-slate-800/50 rounded-lg text-slate-300 hover:bg-slate-800 transition-colors text-sm hover:text-white group"
                   >
                     <div className="flex items-center">
@@ -179,7 +270,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="h-48 bg-slate-800 relative overflow-hidden">
               {/* Placeholder Art */}
               <div className="absolute inset-0 bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center">
-                <div className="text-6xl">🍌</div>
+                <div className="text-6xl">🎨</div>
               </div>
               <div className="absolute inset-0 bg-gradient-to-t from-[#1a1f2e] to-transparent opacity-90"></div>
               <div className="absolute bottom-3 left-3 right-3">
@@ -188,11 +279,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     type="text"
                     placeholder="he crosses arms..."
                     className="bg-transparent border-none text-xs text-white w-full focus:outline-none px-2"
-                    value={nanoBananaPrompt}
-                    onChange={(e) => setNanoBananaPrompt(e.target.value)}
+                    value={canvasPrompt}
+                    onChange={(e) => setCanvasPrompt(e.target.value)}
                   />
                   <button
-                    onClick={() => onNavigate('nano-banana', { prompt: nanoBananaPrompt })}
+                    onClick={() => onNavigate('canvas-studio', { prompt: canvasPrompt })}
                     className="bg-indigo-600 text-xs text-white px-3 py-1 rounded hover:bg-indigo-500"
                   >
                     Generate
@@ -203,7 +294,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="p-4">
               <div className="flex items-center mb-1">
                 <svg className="w-4 h-4 text-slate-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                <h3 className="font-semibold text-white">Nano Banana</h3>
+                <h3 className="font-semibold text-white">Canvas Studio</h3>
               </div>
             </div>
           </div>
@@ -285,8 +376,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 key={type}
                 onClick={() => setFilterType(type)}
                 className={`px-3 py-1 text-xs rounded-full border transition-all ${filterType === type
-                    ? 'bg-indigo-600 border-indigo-500 text-white'
-                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white'
+                  ? 'bg-indigo-600 border-indigo-500 text-white'
+                  : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white'
                   }`}
               >
                 {type.charAt(0).toUpperCase() + type.slice(1).replace('-', ' ')}
@@ -301,8 +392,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {filteredGallery.map((item) => (
-              <div key={item.id} className="group relative aspect-square bg-slate-900 rounded-lg overflow-hidden border border-slate-800 hover:border-indigo-500/50 transition-all">
+            {filteredGallery.map((item, index) => (
+              <div
+                key={item.id}
+                className="group relative aspect-square bg-slate-900 rounded-lg overflow-hidden border border-slate-800 hover:border-indigo-500/50 transition-all cursor-pointer"
+                onClick={() => setLightboxIndex(index)}
+              >
                 {/* For text-only items like character-prompt that might lack a thumbnail, use a placeholder or image */}
                 {item.imageUrl ? (
                   <img src={item.imageUrl} alt={item.type} className="w-full h-full object-cover" />
@@ -355,6 +450,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         )}
       </div>
+
+      {/* Image Lightbox Modal */}
+      {lightboxIndex !== null && (
+        <ImageLightbox
+          images={filteredGallery}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onDelete={onDeleteFromGallery}
+        />
+      )}
     </div>
   );
 };
