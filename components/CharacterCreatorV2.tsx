@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { analyzeCharacterImage, generateAnchorHeadshot, generateAnchorBody } from '../services/aiService';
 import { Button } from './Button';
 import { Dropdown } from './Dropdown';
-import { CharacterDNA, Influencer, AIProvider, AIModel } from '../types';
+import { CharacterDNA, Influencer, AIProvider, AIModel, PoseAsset } from '../types';
+import { PoseLibrary } from './PoseLibrary';
 
 interface CharacterCreatorV2Props {
     onBack: () => void;
@@ -22,6 +23,7 @@ SUBJECT IDENTITY:
 - Eyes: ${identity.eyeDetails}
 - Hair: ${identity.hairDetails}
 - Distinctive features: ${identity.distinctiveFeatures.join(', ')}
+${identity.facialJewelry.length > 0 ? `- Jewelry/Piercings: ${identity.facialJewelry.join(', ')}` : ''}
 
 STYLE CONSTRAINTS:
 - Neutral, pleasant expression (slight natural smile)
@@ -44,13 +46,14 @@ const generateFullBodyPrompt = (blueprint: CharacterDNA['blueprint']): string =>
 BODY COMPOSITION:
 - Subject: ${identity.gender}, ${identity.ageRange}
 - Body type: ${style.bodySomatotype}
-- Standing naturally with arms relaxed at sides
+- Pose: ${style.poseDescription || 'Standing naturally with arms relaxed at sides'}
 - Full body visible from head to feet
 - Centered composition
 
 CLOTHING & ACCESSORIES:
 - Style: ${style.clothingStyle.join(', ')} aesthetic
 - Accessories: ${style.defaultAccessories.join(', ')}
+- Footwear: ${style.clothingStyle.some(s => s.toLowerCase().includes('suit')) ? 'Dress shoes' : 'Matching footwear'}
 - Neutral, timeless outfit
 
 BACKGROUND:
@@ -109,6 +112,10 @@ export const CharacterCreatorV2: React.FC<CharacterCreatorV2Props> = ({ onBack, 
     const [isGeneratingHead, setIsGeneratingHead] = useState(false);
     const [isGeneratingBody, setIsGeneratingBody] = useState(false);
     const [viewingImage, setViewingImage] = useState<{ url: string; title: string } | null>(null);
+
+    // Pose Library Selection
+    const [showPoseLibrary, setShowPoseLibrary] = useState(false);
+    const [selectedPose, setSelectedPose] = useState<PoseAsset | null>(null);
 
     // Model selection
     const [selectedProvider, setSelectedProvider] = useState<AIProvider>(
@@ -181,14 +188,15 @@ export const CharacterCreatorV2: React.FC<CharacterCreatorV2Props> = ({ onBack, 
         }
     }, []);
 
-    // Auto-extract attributes from headshot image
+    // Auto-extract attributes from images
     const handleAutoExtract = useCallback(async () => {
         if (!uploadedHeadshot) return;
 
         setIsAnalyzing(true);
 
         try {
-            const extractedBlueprint = await analyzeCharacterImage(uploadedHeadshot);
+            // Pass both images if available
+            const extractedBlueprint = await analyzeCharacterImage(uploadedHeadshot, uploadedBody || undefined);
             setBlueprint(extractedBlueprint);
 
             // Populate manual attribute dropdowns from extracted blueprint
@@ -207,11 +215,40 @@ export const CharacterCreatorV2: React.FC<CharacterCreatorV2Props> = ({ onBack, 
         } catch (error: any) {
             console.error('Auto-extract failed:', error);
             const errorMsg = error?.message || error?.toString() || 'Unknown error';
-            alert(`Failed to analyze image: ${errorMsg}\n\nPlease check:\n1. Your Gemini API key is set in Settings\n2. The image is clear and contains a person\n3. You have available API quota`);
+            alert(`Failed to analyze image: ${errorMsg}\n\nPlease check:\n1. Your Gemini API key is set in Settings\n2. The image(s) are clear\n3. You have available API quota`);
         } finally {
             setIsAnalyzing(false);
         }
-    }, [uploadedHeadshot]);
+    }, [uploadedHeadshot, uploadedBody]);
+
+    // Helper to convert URL to Base64
+    const imageUrlToBase64 = async (url: string): Promise<string> => {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    };
+
+    // Handle Pose selection
+    const handlePoseSelect = useCallback(async (pose: PoseAsset) => {
+        try {
+            // Convert to Base64 for persistent storage
+            const base64 = await imageUrlToBase64(pose.imageUrl);
+            // Fix: set uploadedBody (reference) not anchorBody (generated)
+            setUploadedBody(base64);
+            setSelectedPose(pose);
+            alert('✅ Pose selected and added to Ref Body!');
+        } catch (error) {
+            console.error('Failed to convert pose to base64:', error);
+            // Fallback to URL if fetch fails
+            setUploadedBody(pose.imageUrl);
+            setSelectedPose(pose);
+        }
+    }, [imageUrlToBase64]);
 
     // Generate prompts from manual attributes
     const handleGeneratePrompts = useCallback(async () => {
@@ -227,10 +264,12 @@ export const CharacterCreatorV2: React.FC<CharacterCreatorV2Props> = ({ onBack, 
                     skinComplexion: `${complexion} complexion`,
                     eyeDetails: 'Expressive eyes',
                     hairDetails: 'Natural hair',
-                    distinctiveFeatures: features !== 'None' ? [features] : []
+                    distinctiveFeatures: features !== 'None' ? [features] : [],
+                    facialJewelry: []
                 },
                 style: {
                     bodySomatotype: bodyType,
+                    poseDescription: 'Standing naturally with arms relaxed at sides',
                     clothingStyle: ['Casual'],
                     defaultAccessories: []
                 }
@@ -296,7 +335,14 @@ export const CharacterCreatorV2: React.FC<CharacterCreatorV2Props> = ({ onBack, 
         setIsGeneratingBody(true);
 
         try {
-            const body = await generateAnchorBody(anchorHeadshot, fullBodyPrompt, headshotPrompt, selectedProvider);
+            // Pass uploadedBody as an optional preference/source of truth
+            const body = await generateAnchorBody(
+                anchorHeadshot,
+                fullBodyPrompt,
+                headshotPrompt,
+                selectedProvider,
+                uploadedBody || undefined
+            );
             setAnchorBody(body);
         } catch (error) {
             console.error('Body generation failed:', error);
@@ -304,7 +350,7 @@ export const CharacterCreatorV2: React.FC<CharacterCreatorV2Props> = ({ onBack, 
         } finally {
             setIsGeneratingBody(false);
         }
-    }, [anchorHeadshot, fullBodyPrompt, headshotPrompt, selectedProvider]);
+    }, [anchorHeadshot, fullBodyPrompt, headshotPrompt, selectedProvider, uploadedBody]);
 
     // Save character
     const handleSave = useCallback(() => {
@@ -419,6 +465,30 @@ export const CharacterCreatorV2: React.FC<CharacterCreatorV2Props> = ({ onBack, 
                         </div>
                     </div>
 
+                    {/* Pose Library Button */}
+                    <div className="mb-4 p-3 bg-gradient-to-r from-indigo-900/30 to-slate-900/30 border border-indigo-500/30 rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                            <div>
+                                <p className="text-sm font-semibold text-indigo-300">👗 Pose Library</p>
+                                <p className="text-xs text-slate-400 mt-0.5">Static fashion pose references</p>
+                            </div>
+                        </div>
+                        <Button
+                            onClick={() => setShowPoseLibrary(true)}
+                            variant="secondary"
+                            size="sm"
+                            className="w-full bg-indigo-600/20 hover:bg-indigo-600/30 border-indigo-500/50"
+                        >
+                            {selectedPose ? '✅ Pose Selected - Change' : '🎨 Select Pose'}
+                        </Button>
+                        {selectedPose && (
+                            <div className="mt-2 p-2 bg-black/30 rounded text-xs">
+                                <p className="text-indigo-300 font-medium">{selectedPose.id}</p>
+                                <p className="text-slate-400">{selectedPose.category} • {selectedPose.gender}</p>
+                            </div>
+                        )}
+                    </div>
+
                     {/* Auto-Extract Button */}
                     {uploadedHeadshot && (
                         <Button
@@ -504,7 +574,7 @@ export const CharacterCreatorV2: React.FC<CharacterCreatorV2Props> = ({ onBack, 
                                 options={
                                     selectedProvider === AIProvider.GOOGLE
                                         ? [AIModel.GEMINI_2_5_FLASH_IMAGE]
-                                        : [AIModel.DOUBAO_SEEDREAM, AIModel.FLUX_1_PRO]
+                                        : [AIModel.DOUBAO_SEEDREAM, AIModel.GEMINI_3_PRO_IMAGE, AIModel.FLUX_1_PRO]
                                 }
                                 onChange={(val) => setSelectedModel(val as AIModel)}
                             />
@@ -616,6 +686,14 @@ export const CharacterCreatorV2: React.FC<CharacterCreatorV2Props> = ({ onBack, 
                         />
                     </div>
                 </div>
+            )}
+
+            {/* Pose Library Modal */}
+            {showPoseLibrary && (
+                <PoseLibrary
+                    onSelect={handlePoseSelect}
+                    onClose={() => setShowPoseLibrary(false)}
+                />
             )}
         </div>
     );

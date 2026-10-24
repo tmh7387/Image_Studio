@@ -1,0 +1,54 @@
+[
+    {
+        "id": "ecom_front_neutral_001",
+        "imageUrl": "/assets/poses/pose_ecom_001.png",
+        "category": "ecom",
+        "gender": "female",
+        "viewAngle": "front",
+        "tags": [
+            "neutral",
+            "studio",
+            "clean",
+            "catalog"
+        ]
+    },
+    {
+        "id": "editorial_dynamic_001",
+        "imageUrl": "/assets/poses/pose_editorial_001.png",
+        "category": "editorial",
+        "gender": "female",
+        "viewAngle": "three_quarter",
+        "tags": [
+            "dynamic",
+            "contrapposto",
+            "fashion",
+            "dramatic"
+        ]
+    },
+    {
+        "id": "runway_walk_001",
+        "imageUrl": "/assets/poses/pose_runway_001.png",
+        "category": "runway",
+        "gender": "female",
+        "viewAngle": "front",
+        "tags": [
+            "walking",
+            "movement",
+            "hight-fashion",
+            "active"
+        ]
+    },
+    {
+        "id": "technical_apose_001",
+        "imageUrl": "/assets/poses/pose_technical_001.png",
+        "category": "technical",
+        "gender": "unisex",
+        "viewAngle": "front",
+        "tags": [
+            "A-pose",
+            "reference",
+            "neutral",
+            "blueprint"
+        ]
+    }
+]

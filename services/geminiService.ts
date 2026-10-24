@@ -238,16 +238,35 @@ export const generateCharacterPrompt = async (
   }
 };
 
-/**
- * IDENTITY FORGE: Step 1 - Vision Extraction
- * Analyzes an uploaded image to create a semantic blueprint
- * @returns CharacterDNA.blueprint structure
- */
-export const analyzeCharacterImage = async (base64Image: string): Promise<CharacterDNA['blueprint']> => {
-  const cleanBase64 = base64Image.replace(/^data:(.*,)?/, '');
+export const analyzeCharacterImage = async (base64Headshot: string, base64Body?: string): Promise<CharacterDNA['blueprint']> => {
+  const cleanHead = base64Headshot.replace(/^data:(.*,)?/, '');
+  const parts: any[] = [
+    {
+      inlineData: {
+        data: cleanHead,
+        mimeType: "image/png"
+      }
+    }
+  ];
+
+  if (base64Body) {
+    const cleanBody = base64Body.replace(/^data:(.*,)?/, '');
+    parts.push({
+      inlineData: {
+        data: cleanBody,
+        mimeType: "image/png"
+      }
+    });
+  }
 
   const prompt = `
-    You are an expert character designer. Analyze the provided image and extract a detailed JSON profile (NO markdown code blocks). 
+    You are an expert character designer. Analyze the provided image(s) and extract a detailed JSON profile (NO markdown code blocks). 
+    
+    SOURCE OF TRUTH INSTRUCTIONS:
+    ${base64Body ?
+      "Image 1 is a close-up HEADSHOT (Identity Source). Image 2 is a FULL-BODY reference (Pose & Outfit Source).\n- Extract face, hair, and facial jewelry from IMAGE 1.\n- Extract pose, body proportions, clothing, and footwear from IMAGE 2.\n- IMAGE 2 is the PRIMARY source of truth for body style and composition." :
+      "Image 1 is a headshot reference. Estimate body style based on visible traits."
+    }
     
     Provide extremely detailed descriptions for:
     - Age Range (e.g., "Late 20s", "Mid 40s")
@@ -257,9 +276,11 @@ export const analyzeCharacterImage = async (base64Image: string): Promise<Charac
     - Eye Details (shape, color, distinctive features: "Almond-shaped hazel eyes with golden flecks")
     - Hair Details (length, texture, color: "Shoulder-length wavy dark brown hair with subtle highlights")
     - Distinctive Features (at least 3: "Beauty mark above lip", "High cheekbones", "Defined jawline")
+    - Facial Jewelry/Piercings (EXTRACT FROM IMAGE 1: "Silver septum ring", "Emerald stud earrings")
     - Body Somatotype (Athletic, Curvy, Slender, etc.)
-    - Clothing Style visible in image (multiple tags: "Minimalist", "Streetwear", "Business Casual")
-    - Accessories visible (if any: "Gold hoop earrings", "Leather watch")
+    - Pose Description (describe the subject's posture and orientation: "standing in a three-quarter pose with hands on hips")
+    - Clothing Style visible (multiple tags: "Minimalist", "Streetwear", "Business Casual")
+    - Clothing Accessories (BAGS, WATCHES, BELTS, FOOTWEAR only - EXCLUDE FACIAL ITEMS)
 
     Output this EXACT JSON structure:
     {
@@ -270,29 +291,25 @@ export const analyzeCharacterImage = async (base64Image: string): Promise<Charac
         "skinComplexion": "string",
         "eyeDetails": "string",
         "hairDetails": "string",
-        "distinctiveFeatures": ["string", "string", "string"]
+        "distinctiveFeatures": ["string", "string", "string"],
+        "facialJewelry": ["string"]
       },
       "style": {
         "bodySomatotype": "string",
+        "poseDescription": "string",
         "clothingStyle": ["string"],
         "defaultAccessories": ["string"]
       }
     }
   `;
 
+  parts.push({ text: prompt });
+
   try {
     const response = await getAiClient().models.generateContent({
       model: TEXT_MODEL_NAME,
       contents: {
-        parts: [
-          {
-            inlineData: {
-              data: cleanBase64,
-              mimeType: "image/png"
-            }
-          },
-          { text: prompt }
-        ]
+        parts: parts
       }
     });
 
@@ -362,12 +379,13 @@ export const generateAnchorHeadshot = async (
 export const generateAnchorBody = async (
   headshotBase64: string,
   fullBodyPrompt: string,
-  headshotPrompt: string
+  headshotPrompt: string,
+  bodyRefBase64?: string
 ): Promise<string> => {
   try {
     const parts: any[] = [];
 
-    // 1. Add headshot reference image FIRST
+    // 1. Add headshot reference image FIRST (Face Source)
     const cleanHeadBase64 = headshotBase64.replace(/^data:(.*,)?/, '');
     parts.push({
       inlineData: {
@@ -376,21 +394,41 @@ export const generateAnchorBody = async (
       },
     });
 
-    // 2. Combine prompts with explicit reference instruction
-    const combinedPrompt = `
-FACIAL CONSISTENCY INSTRUCTION:
-Image 1 is the CHARACTER VISUAL ANCHOR (headshot reference).
-Maintain this EXACT facial identity as described below:
+    // 2. Add body reference image if available (Pose/Style Source)
+    if (bodyRefBase64) {
+      const cleanBodyBase64 = bodyRefBase64.replace(/^data:(.*,)?/, '');
+      parts.push({
+        inlineData: {
+          data: cleanBodyBase64,
+          mimeType: "image/png",
+        },
+      });
+    }
 
+    // 3. Combine prompts with explicit instruction
+    const promptText = bodyRefBase64
+      ? `
+IDENTITY SOURCE (Image 1):
+Maintain this EXACT facial identity:
 ${headshotPrompt}
 
----
+POSE & STYLE SOURCE (Image 2):
+This is the SOURCE OF TRUTH for pose, body proportions, and clothing style.
+Transfer the identity from Image 1 into the exact pose and style of Image 2.
+
+GENERATION TASK:
+${fullBodyPrompt}
+`
+      : `
+FACIAL CONSISTENCY INSTRUCTION (Image 1):
+Maintain this EXACT facial identity:
+${headshotPrompt}
 
 FULL BODY GENERATION:
 ${fullBodyPrompt}
 `;
 
-    parts.push({ text: combinedPrompt });
+    parts.push({ text: promptText });
 
     const response = await getAiClient().models.generateContent({
       model: MODEL_NAME,

@@ -3,6 +3,23 @@
 import { GenerationConfig, GenerationResult, AIModel, AspectRatio } from "../types";
 import { logError } from "../utils/errorHandler";
 
+// Helper to convert URL to Base64
+const urlToBase64 = async (url: string): Promise<string> => {
+    try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    } catch (e) {
+        console.error("Failed to fetch image for base64 conversion", e);
+        return "";
+    }
+};
+
 const getCometKey = () => localStorage.getItem('comet_api_key') || "";
 
 const COMET_API_URL = "https://api.cometapi.com/v1";
@@ -120,16 +137,35 @@ export const generateContent = async (config: GenerationConfig): Promise<Generat
 
     // Add Reference Image part (Multimodal Input)
     if (refImage) {
-        const base64Data = refImage.replace(/^data:image\/[a-z]+;base64,/, "");
-        const mimeMatch = refImage.match(/^data:(image\/[a-z]+);base64,/);
-        const mimeType = mimeMatch ? mimeMatch[1] : "image/jpeg";
+        let base64Data = "";
+        let mimeType = "image/jpeg";
 
-        parts.push({
-            inlineData: {
-                mimeType: mimeType,
-                data: base64Data
+        if (refImage.startsWith('data:')) {
+            base64Data = refImage.replace(/^data:image\/[a-z]+;base64,/, "");
+            const mimeMatch = refImage.match(/^data:(image\/[a-z]+);base64,/);
+            if (mimeMatch) mimeType = mimeMatch[1];
+        } else if (refImage.startsWith('http')) {
+            // It's a URL, fetch it
+            try {
+                const dataUri = await urlToBase64(refImage);
+                if (dataUri) {
+                    base64Data = dataUri.replace(/^data:image\/[a-z]+;base64,/, "");
+                    const mimeMatch = dataUri.match(/^data:(image\/[a-z]+);base64,/);
+                    if (mimeMatch) mimeType = mimeMatch[1];
+                }
+            } catch (e) {
+                console.warn("Could not convert refImage URL to Base64 for Gemini", e);
             }
-        });
+        }
+
+        if (base64Data) {
+            parts.push({
+                inlineData: {
+                    mimeType: mimeType,
+                    data: base64Data
+                }
+            });
+        }
     }
 
     const payload = {

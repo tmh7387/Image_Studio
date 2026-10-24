@@ -18,10 +18,10 @@ export const generateContent = async (config: GenerationConfig): Promise<Generat
     return generateGemini(config);
 };
 
-export const analyzeCharacterImage = async (base64Image: string): Promise<any> => {
+export const analyzeCharacterImage = async (base64Headshot: string, base64Body?: string): Promise<any> => {
     // Always use Gemini for vision analysis (more reliable for character DNA extraction)
     // Provider selection only affects image generation, not analysis
-    return analyzeGemini(base64Image);
+    return analyzeGemini(base64Headshot, base64Body);
 };
 
 export const describeImage = async (base64Image: string, mimeType: string): Promise<string> => {
@@ -83,7 +83,8 @@ export const generateAnchorBody = async (
     headshotBase64: string,
     fullBodyPrompt: string,
     headshotPrompt: string,
-    provider?: AIProvider
+    provider?: AIProvider,
+    bodyRefBase64?: string
 ): Promise<string> => {
     const activeProvider = provider || getProvider();
 
@@ -95,12 +96,12 @@ export const generateAnchorBody = async (
             style: 'photorealistic' as any,
             model: AIModel.DOUBAO_SEEDREAM,
             provider: AIProvider.COMET,
-            base64Image: headshotBase64 // Include headshot as reference if supported
+            base64Image: bodyRefBase64 || headshotBase64 // Prioritize body ref if available
         };
         const result = await generateComet(config);
         return result.imageUrl;
     }
 
     // Use Gemini
-    return bodyGemini(headshotBase64, fullBodyPrompt, headshotPrompt);
+    return bodyGemini(headshotBase64, fullBodyPrompt, headshotPrompt, bodyRefBase64);
 };

@@ -24,6 +24,7 @@ SUBJECT IDENTITY:
 - Eyes: ${identity.eyeDetails}
 - Hair: ${identity.hairDetails}
 - Distinctive features: ${identity.distinctiveFeatures.join(', ')}
+${identity.facialJewelry?.length > 0 ? `- Jewelry/Piercings: ${identity.facialJewelry.join(', ')}` : ''}
 
 STYLE CONSTRAINTS:
 - Neutral, pleasant expression (slight natural smile)
@@ -46,7 +47,7 @@ const generateFullBodyPrompt = (blueprint: CharacterDNA['blueprint']): string =>
 BODY COMPOSITION:
 - Subject: ${identity.gender}, ${identity.ageRange}
 - Body type: ${style.bodySomatotype}
-- Standing naturally with arms relaxed at sides
+- Pose: ${style.poseDescription || 'Standing naturally with arms relaxed at sides'}
 - Full body visible from head to feet
 - Centered composition
 
@@ -172,7 +173,8 @@ export const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onBack, onCh
     setCurrentStep('analyze');
 
     try {
-      const extractedBlueprint = await analyzeCharacterImage(uploadedHeadshot);
+      // Pass both images if available
+      const extractedBlueprint = await analyzeCharacterImage(uploadedHeadshot, uploadedBody || undefined);
       setBlueprint(extractedBlueprint);
 
       // Auto-generate prompts from blueprint
@@ -217,7 +219,14 @@ export const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onBack, onCh
     setIsGeneratingBody(true);
 
     try {
-      const body = await generateAnchorBody(anchorHeadshot, fullBodyPrompt, headshotPrompt, selectedProvider);
+      // Pass uploadedBody as an optional preference/source of truth
+      const body = await generateAnchorBody(
+        anchorHeadshot,
+        fullBodyPrompt,
+        headshotPrompt,
+        selectedProvider,
+        uploadedBody || undefined
+      );
       setAnchorBody(body);
       setCurrentStep('review');
     } catch (error) {

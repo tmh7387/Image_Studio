@@ -1,114 +1,101 @@
 # Character Canvas - Architecture & Feature Documentation
 
-Character Canvas is a client-side AI creative suite built with React and powered by Google's Gemini 2.5 Flash models. It focuses on character consistency ("Influencers"), image generation, and workflow tools for AI artists.
+Character Canvas is a professional-grade AI creative suite built with React. It orchestrates multiple AI providers (Google Gemini, CometAPI) to provide advanced layouts, character consistency ("Character DNA"), and persistent storage via IndexedDB.
 
 ## 1. Tech Stack
 
 - **Frontend Framework**: React 19 (via Vite)
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS
-- **AI Backend**: Google GenAI SDK (`@google/genai`)
-  - Image Generation: `gemini-2.5-flash-image`
-  - Vision/Text: `gemini-2.5-flash`
-- **Persistence**: Browser `localStorage` (No external database currently)
-- **State Management**: React Context / Lifted State in `App.tsx`
+- **AI Backend**: Multi-Provider Architecture
+  - **Google GenAI**: `gemini-2.5-flash-image` (Generation), `gemini-2.5-flash` (Vision/Logic)
+  - **CometAPI**: Aggregator for models like `doubao-seedream`, `flux-1-pro`, `grok-4`
+- **Persistence**: **IndexedDB** (Client-side localized database)
+- **State Management**: React Context / Lifted State in `App.tsx` + `storageService`
 
 ## 2. Core Features
 
 ### 1. Dashboard
-- **Purpose**: Central hub for navigation and asset management.
+- **Purpose**: Central hub for navigation, asset management, and quick actions.
 - **Functionality**:
-  - Displays created Characters ("Influencers").
-  - Displays Gallery of generated images.
-  - Quick actions to delete items or start new workflows.
+  - Displays "Influencers" (Characters) and Gallery grid.
+  - Handles deletion and navigation to sub-modules.
 
-### 2. Canvas Studio (Image Generator)
-- **Purpose**: Primary text-to-image and image-to-image workspace.
+### 2. Canvas Studio (The Generator)
+- **Purpose**: Primary workspace for Text-to-Image and Image-to-Image.
 - **Key Capabilities**:
-  - **Text-to-Image**: Generate images from prompts with selectable Art Styles (e.g., Photorealistic, Anime, Cyberpunk).
-  - **Aspect Ratios**: Supports 1:1, 16:9, 9:16, 4:5, 3:2.
-  - **Image Reference**: Upload an image to use as a composition/pose reference.
-  - **Character Consistency**: Select a saved "Influencer" to inject their identity (face) into the generation using Gemini's reference image capabilities.
+  - **Multi-Model Support**: Switch between Gemini, Doubao, Flux, etc.
+  - **Character Consistency**: Select a saved "Influencer". The system injects their visual anchors (Headshot/Body) into the generation pipeline.
+  - **Composition Control**: Upload reference images for pose/layout guidance.
+  - **Aspect Ratios**: 1:1, 16:9, 9:16, 4:5, 3:2.
 
-### 3. Character Creator
-- **Purpose**: Define and save persistent character profiles.
-- **Data Stored**:
-  - **Identity Image**: Uploaded photo used as the "Face Source" for consistency.
-  - **Attributes**: Age, Gender, Ethnicity, Body Type, etc.
-  - These profiles are saved to `localStorage` and used across other modules.
+### 3. Character Creator V2
+- **Purpose**: Create professional "Character DNA" profiles.
+- **Architecture**: 3-Panel Workflow
+  1.  **References & Attributes**: Upload ref photos or manually define physical traits (Gender, Age, Ethnicity, etc.).
+  2.  **Prompt Engineering**: Auto-generates high-fidelity text prompts for a "Passport Headshot" mapping and "Full Body Lookbook" mapping.
+  3.  **Visual Anchors**: Generates and specifically saves two master images (Headshot & Body) which act as the ground truth for all future "Influencer" generations.
 
-### 4. Character Transfer (formerly Face Swap)
-- **Purpose**: Generative insertion of a character into an existing scene/photo.
-- **Workflow**:
-  1. Upload a Target Scene (Source base for pose/composition).
-  2. Select a Character (Identity Source).
-  3. AI "re-imagines" the scene, generating a new image that maintains the target's composition/lighting but features the character's identity.
-- **Note**: This is distinct from pixel-based "deepfakes". It is a full generative process using the `gemini-2.5-flash-image` reference capabilities.
+### 4. Character Transfer (Face Swap+)
+- **Purpose**: Generative identity injection.
+- **Mechanism**: specific pipeline that uses `gemini-2.5-flash-image` to re-render a target scene while enforcing the identity constraints of a selected Influencer.
 
-### 5. Image to Prompt
-- **Purpose**: Reverse-engineer prompts from images.
-- **Mechanism**: Uses `gemini-2.5-flash` (Vision) to analyze an uploaded image and describe it in "Stable Diffusion prompt format" (Subject, Lighting, Style, etc.).
-- **Integration**: One-click "Use this Prompt" button sends the result to the Studio module.
+### 5. Intelligence Tools
+- **Image to Prompt**: Reverse-engineering vision tool. Uses Gemini Vision to describe an uploaded image in stable-diffusion-style prompt format.
+- **Character Prompt Generator**: Helper tool to write dense descriptive paragraphs for character consistency.
+- **Character Sheet Generator**: Automates the creation of multi-view reference sheets.
 
-### 6. Character Sheet Generator
-- **Purpose**: Create consistent reference sheets for characters.
-- **Functionality**: Generates multiple views/expressions of a selected Influencer in a single layout, useful for consistency testing.
-
-### 7. Character Prompt Generator
-- **Purpose**: Helper tool to write detailed text descriptions for characters.
-- **Mechanism**: Analyzes uploaded headshots/bodyshots + distinct attributes (Gender, Age, etc.) to write a dense, high-quality prompt paragraph.
-
-### 8. Image Editor *(In Progress)*
-- **Purpose**: Edit specific parts of generated images (Inpainting/Outpainting or Adjustment).
-- **Status**: Feature structure exists, logic is specialized for "Editing" tasks via the AI service.
+### 6. Image Editor
+- **Purpose**: AI-powered image modification.
+- **Functionality**: Upload a source image and provide natural language instructions (e.g., "Change background to a city", "Make the car red").
 
 ## 3. Architecture & Data Flow
 
 ### Entry Point & Routing
 - **File**: `App.tsx`
-- **Routing**: No external router (e.g., React Router). Uses a simple state-based view switcher (`currentView` state).
-- **State Persistence**: 
-  - `influencers` and `gallery` states are initialized from `localStorage` on mount.
-  - `useEffect` hooks sync state changes back to `localStorage`.
+- **Routing**: Internal state-based switcher (`currentView`).
+- **Initialization**: On mount, calls `storageService.init()` to open IndexedDB and load data into React state.
 
-### State Management
-- **Global State**: Managed in `App.tsx` and passed down as props.
-  - `influencers`: Array of character profiles.
-  - `gallery`: Array of generated artifacts.
-- **Transient State**: Passed via `handleNavigate(view, config)` to transfer data between views (e.g., sending a generated prompt from *Image to Prompt* -> *Studio*).
+### AI Unified Service Layer
+- **Google Service** (`services/geminiService.ts`):
+  - Direct connection to Google GenAI SDK.
+  - Handles complex multipart requests (text + media).
+- **Comet Service** (`services/cometService.ts`):
+  - Proxy/Aggregator service for external models (Doubao, Flux).
+  - Normalizes responses to match the app's `GenerationResult` interface.
 
-### AI Service Layer
-- **File**: `services/geminiService.ts`
-- **Client**: Instantiates `GoogleGenAI` with an API Key.
-- **Methods**:
-  - `generateContent(config)`: The workhorse function. specific logic handles constructing the multipart request (Text + Reference Images) for Gemini.
-    - Handles logic for "Style" suffixes.
-    - Maps UI Aspect Ratios to API-supported ratios.
-  - `describeImage(base64)`: Calls Flash Vision model for image captioning.
-  - `generateCharacterPrompt(...)`: Complex prompt engineering pipeline that combines visual analysis of uploads with structured text constraints.
+### Storage Layer (IndexedDB)
+- **File**: `services/storageService.ts`
+- **Mechanism**: 
+  - Uses browser native **IndexedDB** for high-capacity storage (Base64 images).
+  - **Stores**: `influencers` (Profiles) and `gallery` (Generations).
+  - **Migration**: Includes `StorageMigration.tsx` to port legacy `localStorage` data to IndexedDB.
 
-## 4. Data Models
+### Data Models (`types.ts`)
 
-### Influencer (Character)
+#### Character DNA (The "Influencer")
 ```typescript
-interface Influencer {
-  id: string | number;
+interface CharacterDNA {
+  id: string;
   name: string;
-  avatarUrl: string; // Base64 or URL of the face reference
-  // Physical attributes (Gender, Age, Ethnicity, etc.) used for prompting text
-  gender?: string;
-  ethnicity?: string; 
-  // ...
+  // The Visual Truth
+  anchorHeadshot: string; // Base64 1:1
+  anchorBody: string;     // Base64 9:16
+  // The Semantic Truth
+  blueprint: {
+    identity: { gender, ethnicity, skin, eyes, hair, ... }; // Immutable
+    style: { bodyType, clothing, ... }; // Mutable
+  };
 }
 ```
 
-### GalleryItem
+#### Gallery Item
 ```typescript
 interface GalleryItem {
   id: string;
-  imageUrl: string; // Base64
+  imageUrl: string;
   prompt: string;
-  type: 'generation' | 'faceswap' | ...;
+  type: 'generation' | 'faceswap' | 'editing' | ...;
   timestamp: number;
 }
 ```
@@ -117,13 +104,17 @@ interface GalleryItem {
 
 ```
 src/
-├── components/          # Feature-specific UI components
-│   ├── Dashboard.tsx    # Home view
-│   ├── NanoBananaStudio.tsx # Main generator
-│   └── ...              # Other feature components
+├── components/           # UI Modules
+│   ├── CanvasStudio.tsx      # Main Generator
+│   ├── CharacterCreatorV2.tsx # DNA Builder
+│   ├── ImageEditor.tsx       # AI Editor
+│   ├── StorageMigration.tsx  # DB Utils
+│   └── ... 
 ├── services/
-│   └── geminiService.ts # Google GenAI SDK wrapper
-├── App.tsx              # Main controller & State container
-├── types.ts             # TypeScript definitions
-└── main.tsx            # React entry
+│   ├── geminiService.ts  # Google GenAI Logic
+│   ├── cometService.ts   # 3rd Party Model Logic
+│   ├── storageService.ts # IndexedDB Wrapper
+│   └── aiService.ts      # Shared Utilities
+├── types.ts              # Global Interfaces
+└── App.tsx               # Main Controller
 ```

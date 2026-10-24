@@ -308,7 +308,7 @@ export const CanvasStudio: React.FC<CanvasStudioProps> = ({
                   options={
                     selectedProvider === AIProvider.GOOGLE
                       ? [AIModel.GEMINI_2_5_FLASH_IMAGE]
-                      : [AIModel.DOUBAO_SEEDREAM, AIModel.FLUX_1_PRO]
+                      : [AIModel.DOUBAO_SEEDREAM, AIModel.GEMINI_3_PRO_IMAGE, AIModel.FLUX_1_PRO]
                   }
                   onChange={(val) => setSelectedModel(val as AIModel)}
                 />

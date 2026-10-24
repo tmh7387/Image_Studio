@@ -85,11 +85,13 @@ export interface CharacterDNA {
       eyeDetails: string;     // e.g., "Almond-shaped hazel eyes"
       hairDetails: string;    // e.g., "Shoulder-length wavy dark brown hair"
       distinctiveFeatures: string[]; // e.g., ["Beauty mark on chin", "High cheekbones"]
+      facialJewelry: string[]; // e.g., ["Septum ring", "Gold hoop earrings"]
     };
 
     // MUTABLE: The default "Vibe" (Can be overridden in scenes later)
     style: {
       bodySomatotype: string; // e.g., "Athletic", "Curvy", "Tall and lanky"
+      poseDescription?: string; // e.g., "Standing naturally with arms relaxed"
       clothingStyle: string[]; // e.g., ["Minimalist", "Streetwear"]
       defaultAccessories: string[]; // e.g., ["Gold hoop earrings"]
     };
@@ -133,4 +135,17 @@ export interface GalleryItem {
   type: 'generation' | 'faceswap' | 'editing' | 'image-to-prompt' | 'character-prompt';
   timestamp: number;
   influencerId?: string | number;
+}
+
+// ============================================================================
+// Pose Library Types
+// ============================================================================
+
+export interface PoseAsset {
+  id: string;
+  imageUrl: string;
+  category: 'ecom' | 'editorial' | 'runway' | 'technical';
+  gender: 'male' | 'female' | 'unisex';
+  viewAngle?: 'front' | 'three_quarter' | 'side' | 'back';
+  tags?: string[];
 }

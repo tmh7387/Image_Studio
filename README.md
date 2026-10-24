@@ -1,77 +1,90 @@
 # Character Canvas 🎨
 
-ImCharacter Canvas is a powerful AI-powered creative suite built with React, Vite, and Google's Gemini models. It allows users to generate images, create consistent characters (influencers), perform face swaps, and more, all within a modern, responsive interface.
+Character Canvas is a professional-grade AI creative suite designed for artists and creators who need **character consistency** and powerful image generation workflows. Built with a modern React stack and powered by **Google Gemini 2.5 Flash**, it offers a seamless, client-side experience for creating, managing, and evolving digital identities.
 
-## Features
+---
 
-*   **Dashboard**: Central hub to manage your creations and characters.
-*   **Canvas Studio**: Advanced image generation using `gemini-2.5-flash-image`. Supports various art styles and aspect ratios.
-*   **Character Creator**: Define and save custom "Influencers" with specific physical attributes and styles to ensure consistency across generations.
-*   **Character Transfer**: Generatively insert your saved character identities into new scenes or poses.
-*   **Image to Prompt**: Reverse engineer prompts from existing images to understand how to recreate styles.
-*   **Character Sheet Generator**: Create consistent character reference sheets.
-*   **Image Editor**: (Feature in progress) Edit generated images.
-*   **Character Prompt Generator**: Generate detailed text prompts based on visual references and attributes.
+## 🚀 Key Modules & Functionalities
 
-## Tech Stack
+### 1. **Dashboard** 🏠
+The central nerve center of the application.
+- **Identity Management**: View and manage your saved "Influencers" (Character DNA).
+- **Creative Gallery**: A persistent archive of all your generations, face swaps, and prompt extractions.
+- **Quick Links**: Fast access to all creative tools and settings.
 
-*   **Frontend**: React 19, Vite, TypeScript
-*   **Styling**: Tailwind CSS
-*   **AI**: Google GenAI SDK (`@google/genai`)
-    *   Image Generation: `gemini-2.5-flash-image`
-    *   Text/Prompt Generation: `gemini-2.5-flash`
-*   **Persistence**: LocalStorage (Current)
+### 2. **Canvas Studio** 🖌️
+The primary playground for image generation.
+- **Character Consistency**: Select a saved Influencer to "lock" their identity. The AI uses the character's reference image and attributes to ensure consistent features across generations.
+- **Compositional References**: Upload a "Pose/Composition" image to guide the AI's layout.
+- **Artistic Styles**: One-click selection of high-quality styles (Photorealistic, Anime, Cinematic, Cyberpunk, etc.).
+- **Flexible Aspect Ratios**: Precision control over output dimensions (1:1, 16:9, 9:16, 4:5, 3:2).
 
-## Getting Started
+### 3. **Character Creator V2** 🧬
+Building a persistent digital soul.
+- **Character DNA**: Upload a master reference image to establish the facial and physical identity.
+- **Granular Attributes**: Define Gender, Age, Ethnicity, Body Type, and Hair Style.
+- **3-Panel Interface**: A state-of-the-art layout for defining, refining, and previewing your character profiles.
+
+### 4. **Face Swap (Character Transfer)** 🔄
+Beyond Simple Deepfakes.
+- **Identity Injection**: Take any scene or existing image and "generatively" swap the character with your saved Influencer.
+- **Context Awareness**: Unlike pixel-based swappers, this process uses Gemini's generative power to maintain lighting, shadows, and artistic style while updating the identity.
+
+### 5. **Intelligence Tools** 🧠
+- **Image to Prompt**: Upload any image to reverse-engineer its visual style and subject into a high-density AI prompt.
+- **Character Prompt Generator**: Automatically generates complex, high-quality prompt paragraphs based on your character's visual attributes.
+- **Character Sheet Generator**: Instantly create a multi-view reference sheet for your character, perfect for concept art and consistency checks.
+
+---
+
+## 🛠️ Tech Stack & Architecture
+
+- **Frontend**: React 19, TypeScript, Vite.
+- **Styling**: Tailwind CSS with a premium glassmorphic design system.
+- **AI Core**: Google GenAI SDK
+  - **Vision & Logic**: `gemini-2.5-flash`
+  - **Image Generation**: `gemini-2.5-flash-image`
+- **Persistence**: 
+  - **IndexedDB**: Robust, high-capacity client-side storage for images and profiles.
+  - **Migration Engine**: Automatic handling of legacy `localStorage` data into the new IndexedDB system.
+
+---
+
+## ⚙️ Getting Started
 
 ### Prerequisites
-
-*   Node.js (v18 or higher recommended)
-*   npm or yarn
-*   A Google Gemini API Key
+- Node.js (v18+)
+- A Google Gemini API Key ([Get one here](https://aistudio.google.com/))
 
 ### Installation
+1. **Clone the repo:**
+   ```bash
+   git clone <repository-url>
+   cd Image_Studio
+   ```
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+3. **Configure Environment:**
+   Create a `.env` file in the root:
+   ```env
+   VITE_GEMINI_API_KEY=your_key_here
+   ```
+4. **Launch:**
+   ```bash
+   npm run dev
+   ```
 
-1.  Clone the repository:
-    ```bash
-    git clone <repository-url>
-    cd nanobanana-studio
-    ```
+---
 
-2.  Install dependencies:
-    ```bash
-    npm install
-    ```
+## 🎨 Creative Workflow
+1. **Setup**: Add your API key in the **Settings Modal** (gear icon).
+2. **Define**: Use the **Character Creator** to build your first "Influencer".
+3. **Generate**: Go to **Canvas Studio**, select your character, and type a prompt.
+4. **Refine**: Use **Face Swap** to move your character into new scenes or **Image to Prompt** to borrow styles from other artists.
 
-3.  Configure Environment Variables:
-    *   Create a `.env` file in the root directory.
-    *   Add your Gemini API key:
-        ```env
-        VITE_GEMINI_API_KEY=your_api_key_here
-        ```
-    *   *Note: The current codebase might check `process.env.API_KEY` or similar. Ensure the service file `services/geminiService.ts` is using the correct environment variable format for Vite (`import.meta.env.VITE_...` or configured via `define` in vite config).*
+---
 
-4.  Run the development server:
-    ```bash
-    npm run dev
-    ```
-
-5.  Open your browser and navigate to `http://localhost:5173` (or the port shown in the terminal).
-
-## Usage
-
-1.  **Create a Character**: Go to "Create Character" to define your influencer's look.
-2.  **Generate Images**: Use the "NanoBanana Studio" to generate images. You can select your created character to maintain consistency.
-3.  **Character Transfer**: Upload a reference scene and select a character to transfer their identity while maintaining the scene's composition.
-4.  **Gallery**: Your creations are saved locally to your browser's LocalStorage.
-
-## Project Structure
-
-*   `src/components`: React components for each feature (Dashboard, Studio, etc.).
-*   `src/services`: API integration logic (Gemini service).
-*   `src/types.ts`: TypeScript definitions for data models.
-*   `App.tsx`: Main application routing and state management.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+## 🔐 Privacy & Data
+Character Canvas is **fully client-side**. Your images, characters, and API keys are stored locally in your browser's IndexedDB. Your data never touches our servers—it's between you and your AI provider.
